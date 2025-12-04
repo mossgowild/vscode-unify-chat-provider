@@ -13,7 +13,7 @@ More API formats will be added in future releases.
 ## Features
 
 - Register multiple LLM API endpoints as language model providers
-- Support for different API formats (currently Anthropic, more coming soon)
+- Support for different API formats
 - Multiple providers and models per provider
 - Streaming responses with proper cancellation handling
 - Tool calling support
@@ -96,38 +96,6 @@ Models can be specified as simple strings or as objects with additional configur
 - **Unify Chat Provider: Add Provider** - Interactive wizard to add a new provider
 - **Unify Chat Provider: Remove Provider** - Remove a configured provider
 - **Unify Chat Provider: Manage Providers** - Open settings to manage providers
-
-## Architecture
-
-The extension implements the `LanguageModelChatProvider` interface with:
-
-- `provideLanguageModelChatInformation()` - Returns available models from all configured providers
-- `provideLanguageModelChatResponse()` - Handles chat requests with streaming support
-- `provideTokenCount()` - Provides token count estimation
-
-### Extensible Design
-
-The extension uses a factory pattern to support multiple API formats:
-
-```
-src/
-├── types.ts              # Type definitions and ApiClient interface
-├── config/
-│   └── store.ts          # Configuration management
-├── client/
-│   └── anthropic.ts      # Anthropic API client implementation
-├── provider/
-│   └── chatProvider.ts   # LanguageModelChatProvider with client factory
-├── commands/
-│   └── index.ts          # Command handlers
-└── extension.ts          # Extension entry point
-```
-
-Adding support for a new API format involves:
-
-1. Adding a new type to `ProviderType` in `types.ts`
-2. Creating a new client class implementing `ApiClient` in `src/client/`
-3. Updating the factory function in `chatProvider.ts`
 
 ## API Compatibility
 

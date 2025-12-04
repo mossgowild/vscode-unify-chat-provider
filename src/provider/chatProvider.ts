@@ -2,12 +2,10 @@ import * as vscode from 'vscode';
 import { ConfigStore } from '../config/store';
 import { AnthropicClient } from '../client/anthropic';
 import { ProviderConfig, ModelConfig, ApiClient } from '../types';
-
-/**
- * Default token limits for models
- */
-const DEFAULT_MAX_INPUT_TOKENS = 200000;
-const DEFAULT_MAX_OUTPUT_TOKENS = 8192;
+import {
+  DEFAULT_MAX_INPUT_TOKENS,
+  DEFAULT_MAX_OUTPUT_TOKENS,
+} from '../config/defaults';
 
 /**
  * Create an API client based on provider type

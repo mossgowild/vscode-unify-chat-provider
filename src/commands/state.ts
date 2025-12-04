@@ -1,5 +1,9 @@
 import * as vscode from 'vscode';
 import { ConfigStore } from '../config/store';
+import {
+  DEFAULT_MAX_INPUT_TOKENS,
+  DEFAULT_MAX_OUTPUT_TOKENS,
+} from '../config/defaults';
 import { ModelConfig, ProviderConfig, ProviderType } from '../types';
 import { PROVIDER_TYPE_OPTIONS } from './providerTypes';
 import { pickQuickItem, showInput, showValidationErrors } from './ui';
@@ -158,10 +162,19 @@ async function openProviderForm(
       },
     });
 
-    if (!selection) return 'cancelled';
-
-    if (selection.action === 'cancel') {
-      return 'cancelled';
+    if (!selection || selection.action === 'cancel') {
+      const decision = await confirmDiscardProviderChanges(draft, existing);
+      if (decision === 'discard') return 'cancelled';
+      if (decision === 'save') {
+        const saved = await saveProviderDraft(
+          draft,
+          store,
+          existing,
+          originalName,
+        );
+        if (saved === 'saved') return 'saved';
+      }
+      continue;
     }
 
     if (selection.action === 'delete' && existing) {
@@ -181,23 +194,14 @@ async function openProviderForm(
     }
 
     if (selection.action === 'confirm') {
-      const errors = validateProviderForm(draft, store, originalName);
-      if (errors.length > 0) {
-        await showValidationErrors(errors);
-        continue;
-      }
-
-      const provider: ProviderConfig = normalizeProviderDraft(draft);
-      if (originalName && provider.name !== originalName) {
-        await store.removeProvider(originalName);
-      }
-      await store.upsertProvider(provider);
-      vscode.window.showInformationMessage(
-        existing
-          ? `Provider "${provider.name}" updated.`
-          : `Provider "${provider.name}" added.`,
+      const saved = await saveProviderDraft(
+        draft,
+        store,
+        existing,
+        originalName,
       );
-      return 'saved';
+      if (saved === 'saved') return 'saved';
+      continue;
     }
 
     const field = selection.field;
@@ -235,7 +239,8 @@ async function editProviderField(
         prompt: 'Enter a name for this provider',
         placeHolder: 'e.g., Anthropic, OpenRouter, Custom',
         value: draft.name ?? '',
-        validateInput: (v) => validateProviderNameUnique(v, store, originalName),
+        validateInput: (v) =>
+          validateProviderNameUnique(v, store, originalName),
       });
       if (val !== undefined) draft.name = val.trim() || undefined;
       break;
@@ -363,10 +368,19 @@ async function runModelForm(
       },
     });
 
-    if (!selection) return { kind: 'cancelled' };
-
-    if (selection.action === 'cancel') {
-      return { kind: 'cancelled' };
+    if (!selection || selection.action === 'cancel') {
+      const decision = await confirmDiscardModelChanges(
+        draft,
+        models,
+        model,
+        originalId,
+      );
+      if (decision === 'discard') return { kind: 'cancelled' };
+      if (decision === 'save') {
+        const saved = await validateAndBuildModel(draft, models, originalId);
+        if (saved) return { kind: 'saved', model: saved };
+      }
+      continue;
     }
 
     if (selection.action === 'delete') {
@@ -374,12 +388,9 @@ async function runModelForm(
     }
 
     if (selection.action === 'confirm') {
-      const err = validateModelIdUnique(draft.id, models, originalId);
-      if (err) {
-        await showValidationErrors([err]);
-        continue;
-      }
-      return { kind: 'saved', model: normalizeModelDraft(draft) };
+      const saved = await validateAndBuildModel(draft, models, originalId);
+      if (saved) return { kind: 'saved', model: saved };
+      continue;
     }
 
     const field = selection.field;
@@ -417,7 +428,7 @@ async function editModelField(
     }
     case 'maxInputTokens': {
       const val = await showInput({
-        prompt: 'Enter max input tokens (leave blank for default)',
+        prompt: `Enter max input tokens (leave blank for defaults: ${DEFAULT_MAX_INPUT_TOKENS.toLocaleString()})`,
         value: draft.maxInputTokens?.toString() || '',
         validateInput: validatePositiveIntegerOrEmpty,
       });
@@ -427,7 +438,7 @@ async function editModelField(
     }
     case 'maxOutputTokens': {
       const val = await showInput({
-        prompt: 'Enter max output tokens (leave blank for default)',
+        prompt: `Enter max output tokens (leave blank for defaults: ${DEFAULT_MAX_OUTPUT_TOKENS.toLocaleString()})`,
         value: draft.maxOutputTokens?.toString() || '',
         validateInput: validatePositiveIntegerOrEmpty,
       });
@@ -485,8 +496,7 @@ function buildProviderFormItems(
         PROVIDER_TYPE_OPTIONS.find((o) => o.value === draft.type)?.label ||
         '(required)',
       detail: draft.type
-        ? PROVIDER_TYPE_OPTIONS.find((o) => o.value === draft.type)
-            ?.description
+        ? PROVIDER_TYPE_OPTIONS.find((o) => o.value === draft.type)?.description
         : undefined,
       field: 'type',
     },
@@ -508,9 +518,7 @@ function buildProviderFormItems(
     {
       label: '$(symbol-misc) Models',
       description:
-        modelCount > 0
-          ? `${modelCount} model(s)`
-          : '(optional, none added)',
+        modelCount > 0 ? `${modelCount} model(s)` : '(optional, none added)',
       detail:
         modelCount > 0
           ? draft.models.map((m) => m.name || m.id).join(', ')
@@ -570,6 +578,9 @@ function buildModelFormItems(
   draft: ModelConfig,
   isEditing: boolean,
 ): ModelFormItem[] {
+  const defaultMaxInputDescription = `optional, defaults: ${DEFAULT_MAX_INPUT_TOKENS.toLocaleString()}`;
+  const defaultMaxOutputDescription = `optional, defaults: ${DEFAULT_MAX_OUTPUT_TOKENS.toLocaleString()}`;
+
   const items: ModelFormItem[] = [
     {
       label: '',
@@ -594,13 +605,13 @@ function buildModelFormItems(
     {
       label: '$(arrow-down) Max Input Tokens',
       description:
-        draft.maxInputTokens?.toLocaleString() || '(optional, use default)',
+        draft.maxInputTokens?.toLocaleString() || defaultMaxInputDescription,
       field: 'maxInputTokens',
     },
     {
       label: '$(arrow-up) Max Output Tokens',
       description:
-        draft.maxOutputTokens?.toLocaleString() || '(optional, use default)',
+        draft.maxOutputTokens?.toLocaleString() || defaultMaxOutputDescription,
       field: 'maxOutputTokens',
     },
     { label: '', kind: vscode.QuickPickItemKind.Separator },
@@ -661,4 +672,148 @@ function cloneModels(models: ModelConfig[]): ModelConfig[] {
 function removeModel(models: ModelConfig[], id: string): void {
   const idx = models.findIndex((m) => m.id === id);
   if (idx !== -1) models.splice(idx, 1);
+}
+
+async function confirmDiscardProviderChanges(
+  draft: ProviderFormDraft,
+  original?: ProviderConfig,
+): Promise<'discard' | 'save' | 'stay'> {
+  if (!hasProviderChanges(draft, original)) return 'discard';
+  const choice = await vscode.window.showWarningMessage(
+    'Discard unsaved provider changes?',
+    { modal: true },
+    'Discard',
+    'Save',
+  );
+  if (choice === 'Discard') return 'discard';
+  if (choice === 'Save') return 'save';
+  return 'stay';
+}
+
+async function confirmDiscardModelChanges(
+  draft: ModelConfig,
+  models: ModelConfig[],
+  original?: ModelConfig,
+  originalId?: string,
+): Promise<'discard' | 'save' | 'stay'> {
+  if (!hasModelChanges(draft, original)) return 'discard';
+  const choice = await vscode.window.showWarningMessage(
+    'Discard unsaved model changes?',
+    { modal: true },
+    'Discard',
+    'Save',
+  );
+  if (choice === 'Discard') return 'discard';
+  if (choice === 'Save') {
+    const err = validateModelIdUnique(draft.id, models, originalId);
+    if (err) {
+      await showValidationErrors([err]);
+      return 'stay';
+    }
+    return 'save';
+  }
+  return 'stay';
+}
+
+function hasProviderChanges(
+  draft: ProviderFormDraft,
+  original?: ProviderConfig,
+): boolean {
+  const trimmedName = draft.name?.trim();
+  const trimmedBaseUrl = draft.baseUrl?.trim();
+  const trimmedApiKey = draft.apiKey?.trim();
+
+  if (!original) {
+    return (
+      !!draft.type ||
+      !!trimmedName ||
+      !!trimmedBaseUrl ||
+      !!trimmedApiKey ||
+      draft.models.length > 0
+    );
+  }
+
+  if (draft.type !== original.type) return true;
+  if ((trimmedName ?? '') !== original.name) return true;
+  if ((trimmedBaseUrl ?? '') !== original.baseUrl) return true;
+  if ((trimmedApiKey ?? '') !== (original.apiKey ?? '')) return true;
+  return modelsChanged(draft.models, original.models);
+}
+
+function hasModelChanges(
+  draft: ModelConfig,
+  original?: ModelConfig,
+): boolean {
+  const trimmedId = draft.id.trim();
+  const trimmedName = draft.name?.trim() ?? '';
+  const inputTokens = draft.maxInputTokens ?? null;
+  const outputTokens = draft.maxOutputTokens ?? null;
+
+  if (!original) {
+    return (
+      !!trimmedId || !!trimmedName || inputTokens !== null || outputTokens !== null
+    );
+  }
+
+  return (
+    trimmedId !== original.id ||
+    trimmedName !== (original.name ?? '') ||
+    inputTokens !== (original.maxInputTokens ?? null) ||
+    outputTokens !== (original.maxOutputTokens ?? null)
+  );
+}
+
+function modelsChanged(
+  next: ModelConfig[],
+  original: ModelConfig[],
+): boolean {
+  if (next.length !== original.length) return true;
+  return next.some((model, idx) => !modelsEqual(model, original[idx]));
+}
+
+function modelsEqual(a: ModelConfig, b: ModelConfig): boolean {
+  return (
+    a.id === b.id &&
+    (a.name ?? '') === (b.name ?? '') &&
+    (a.maxInputTokens ?? null) === (b.maxInputTokens ?? null) &&
+    (a.maxOutputTokens ?? null) === (b.maxOutputTokens ?? null)
+  );
+}
+
+async function saveProviderDraft(
+  draft: ProviderFormDraft,
+  store: ConfigStore,
+  existing?: ProviderConfig,
+  originalName?: string,
+): Promise<'saved' | 'invalid'> {
+  const errors = validateProviderForm(draft, store, originalName);
+  if (errors.length > 0) {
+    await showValidationErrors(errors);
+    return 'invalid';
+  }
+
+  const provider: ProviderConfig = normalizeProviderDraft(draft);
+  if (originalName && provider.name !== originalName) {
+    await store.removeProvider(originalName);
+  }
+  await store.upsertProvider(provider);
+  vscode.window.showInformationMessage(
+    existing
+      ? `Provider "${provider.name}" updated.`
+      : `Provider "${provider.name}" added.`,
+  );
+  return 'saved';
+}
+
+async function validateAndBuildModel(
+  draft: ModelConfig,
+  models: ModelConfig[],
+  originalId?: string,
+): Promise<ModelConfig | undefined> {
+  const err = validateModelIdUnique(draft.id, models, originalId);
+  if (err) {
+    await showValidationErrors([err]);
+    return undefined;
+  }
+  return normalizeModelDraft(draft);
 }
