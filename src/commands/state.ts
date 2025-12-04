@@ -15,6 +15,8 @@ import {
   validateBaseUrl,
 } from './validation';
 import { normalizeBaseUrlInput } from '../utils/url';
+import { ANTHROPIC_WELL_KNOWN_MODELS } from '../client/anthropic/wellKnownModels';
+import { AnthropicClient } from '../client/anthropic/client';
 
 type ProviderFormDraft = {
   type?: ProviderType;
@@ -35,7 +37,7 @@ type ProviderFormItem = vscode.QuickPickItem & {
 };
 
 type ModelListItem = vscode.QuickPickItem & {
-  action?: 'add' | 'back' | 'edit';
+  action?: 'add' | 'back' | 'edit' | 'add-from-official' | 'add-from-wellknown';
   model?: ModelConfig;
 };
 
@@ -271,6 +273,7 @@ async function editProviderField(
       await manageModelList(draft.models, {
         providerLabel: draft.name ?? originalName ?? 'Provider',
         requireAtLeastOne: false,
+        draft,
       });
       break;
     }
@@ -279,7 +282,11 @@ async function editProviderField(
 
 async function manageModelList(
   models: ModelConfig[],
-  options: { providerLabel: string; requireAtLeastOne?: boolean },
+  options: {
+    providerLabel: string;
+    requireAtLeastOne?: boolean;
+    draft?: ProviderFormDraft;
+  },
 ): Promise<void> {
   const mustKeepOne = options.requireAtLeastOne ?? false;
   for (;;) {
@@ -319,6 +326,45 @@ async function manageModelList(
       const result = await runModelForm(undefined, models);
       if (result.kind === 'saved') {
         models.push(result.model);
+      }
+      continue;
+    }
+
+    if (selection.action === 'add-from-official') {
+      if (!options.draft?.baseUrl || !options.draft?.type) {
+        vscode.window.showErrorMessage(
+          'Please configure API Format and Base URL first before fetching official models.',
+        );
+        continue;
+      }
+      const addedModels = await showModelSelectionPicker({
+        title: 'Add From Official Model List',
+        existingModels: models,
+        fetchModels: async () => {
+          const client = new AnthropicClient({
+            type: options.draft!.type!,
+            name: options.draft!.name ?? 'temp',
+            baseUrl: options.draft!.baseUrl!,
+            apiKey: options.draft!.apiKey,
+            models: [],
+          });
+          return await client.getAvailableModels();
+        },
+      });
+      if (addedModels) {
+        models.push(...addedModels);
+      }
+      continue;
+    }
+
+    if (selection.action === 'add-from-wellknown') {
+      const addedModels = await showModelSelectionPicker({
+        title: 'Add From Well-Known Model List',
+        existingModels: models,
+        fetchModels: async () => ANTHROPIC_WELL_KNOWN_MODELS,
+      });
+      if (addedModels) {
+        models.push(...addedModels);
       }
       continue;
     }
@@ -553,6 +599,14 @@ function buildModelListItems(models: ModelConfig[]): ModelListItem[] {
   const items: ModelListItem[] = [
     { label: '$(arrow-left) Done', action: 'back' },
     { label: '$(add) Add Model...', action: 'add' },
+    {
+      label: '$(cloud-download) Add From Official Model List...',
+      action: 'add-from-official',
+    },
+    {
+      label: '$(list-unordered) Add From Well-Known Model List...',
+      action: 'add-from-wellknown',
+    },
   ];
 
   if (models.length > 0) {
@@ -740,10 +794,7 @@ function hasProviderChanges(
   return modelsChanged(draft.models, original.models);
 }
 
-function hasModelChanges(
-  draft: ModelConfig,
-  original?: ModelConfig,
-): boolean {
+function hasModelChanges(draft: ModelConfig, original?: ModelConfig): boolean {
   const trimmedId = draft.id.trim();
   const trimmedName = draft.name?.trim() ?? '';
   const inputTokens = draft.maxInputTokens ?? null;
@@ -751,7 +802,10 @@ function hasModelChanges(
 
   if (!original) {
     return (
-      !!trimmedId || !!trimmedName || inputTokens !== null || outputTokens !== null
+      !!trimmedId ||
+      !!trimmedName ||
+      inputTokens !== null ||
+      outputTokens !== null
     );
   }
 
@@ -763,10 +817,7 @@ function hasModelChanges(
   );
 }
 
-function modelsChanged(
-  next: ModelConfig[],
-  original: ModelConfig[],
-): boolean {
+function modelsChanged(next: ModelConfig[], original: ModelConfig[]): boolean {
   if (next.length !== original.length) return true;
   return next.some((model, idx) => !modelsEqual(model, original[idx]));
 }
@@ -816,4 +867,152 @@ async function validateAndBuildModel(
     return undefined;
   }
   return normalizeModelDraft(draft);
+}
+
+type ModelSelectionItem = vscode.QuickPickItem & {
+  model?: ModelConfig;
+  action?: 'back';
+};
+
+interface ShowModelSelectionPickerOptions {
+  title: string;
+  existingModels: ModelConfig[];
+  fetchModels: () => Promise<ModelConfig[]>;
+}
+
+/**
+ * Show a model selection picker with multi-select support
+ * Returns the selected models or undefined if cancelled
+ */
+async function showModelSelectionPicker(
+  options: ShowModelSelectionPickerOptions,
+): Promise<ModelConfig[] | undefined> {
+  return new Promise<ModelConfig[] | undefined>((resolve) => {
+    const qp = vscode.window.createQuickPick<ModelSelectionItem>();
+    qp.title = options.title;
+    qp.placeholder = 'Loading models...';
+    qp.canSelectMany = true;
+    qp.ignoreFocusOut = true;
+    qp.busy = true;
+    qp.items = [{ label: '$(arrow-left) Back', action: 'back' }];
+
+    let isLoading = true;
+
+    // Fetch models asynchronously
+    options
+      .fetchModels()
+      .then((models) => {
+        isLoading = false;
+        qp.busy = false;
+        qp.placeholder = 'Select models to add';
+
+        const existingIds = new Set(options.existingModels.map((m) => m.id));
+        const items: ModelSelectionItem[] = [
+          { label: '$(arrow-left) Back', action: 'back' },
+          { label: '', kind: vscode.QuickPickItemKind.Separator },
+        ];
+
+        for (const model of models) {
+          const alreadyExists = existingIds.has(model.id);
+          items.push({
+            label: model.name || model.id,
+            description: model.name ? model.id : undefined,
+            detail: alreadyExists
+              ? '(already added)'
+              : formatModelDetail(model),
+            model,
+            picked: false,
+          });
+        }
+
+        if (models.length === 0) {
+          items.push({
+            label: '$(info) No models available',
+            description: 'The API returned no models',
+          });
+        }
+
+        qp.items = items;
+      })
+      .catch((error) => {
+        isLoading = false;
+        qp.busy = false;
+        qp.placeholder = 'Failed to load models';
+        qp.items = [
+          { label: '$(arrow-left) Back', action: 'back' },
+          { label: '', kind: vscode.QuickPickItemKind.Separator },
+          {
+            label: '$(error) Failed to load models',
+            description: error instanceof Error ? error.message : String(error),
+          },
+        ];
+      });
+
+    qp.onDidAccept(() => {
+      const selectedItems = qp.selectedItems;
+
+      // Check if Back button is in selection (shouldn't happen with canSelectMany, but check anyway)
+      if (
+        selectedItems.some((item: ModelSelectionItem) => item.action === 'back')
+      ) {
+        qp.hide();
+        resolve(undefined);
+        return;
+      }
+
+      // If loading or no selection, ignore
+      if (isLoading || selectedItems.length === 0) {
+        return;
+      }
+
+      // Filter out already existing models and collect selected models
+      const existingIds = new Set(options.existingModels.map((m) => m.id));
+      const newModels: ModelConfig[] = [];
+      const conflictIds: string[] = [];
+
+      for (const item of selectedItems) {
+        if (item.model) {
+          if (existingIds.has(item.model.id)) {
+            conflictIds.push(item.model.id);
+          } else {
+            newModels.push({ ...item.model });
+          }
+        }
+      }
+
+      if (conflictIds.length > 0) {
+        vscode.window.showWarningMessage(
+          `The following models are already added and will be skipped: ${conflictIds.join(
+            ', ',
+          )}`,
+        );
+      }
+
+      if (newModels.length > 0) {
+        vscode.window.showInformationMessage(
+          `Added ${newModels.length} model(s): ${newModels
+            .map((m) => m.name || m.id)
+            .join(', ')}`,
+        );
+      }
+
+      qp.hide();
+      resolve(newModels.length > 0 ? newModels : undefined);
+    });
+
+    // Handle single click on Back item
+    qp.onDidChangeSelection((items: readonly ModelSelectionItem[]) => {
+      if (items.some((item: ModelSelectionItem) => item.action === 'back')) {
+        qp.hide();
+        resolve(undefined);
+      }
+    });
+
+    qp.onDidHide(() => {
+      qp.dispose();
+      resolve(undefined);
+    });
+
+    qp.show();
+  });
 }

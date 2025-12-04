@@ -1,43 +1,25 @@
 import * as vscode from 'vscode';
+import { ProviderConfig, ApiClient, ModelConfig } from '../../types';
 import {
-  ProviderConfig,
   AnthropicMessage,
   AnthropicRequest,
   AnthropicStreamEvent,
   AnthropicTextBlock,
   AnthropicToolUseBlock,
   AnthropicTool,
-  ApiClient,
-  ModelConfig,
-} from '../types';
+  AnthropicListModelsResponse,
+} from './types';
 import {
   buildAnthropicMessagesUrl,
   buildAnthropicModelsUrl,
-} from '../utils/url';
-
-/**
- * Anthropic ListModels API response types
- */
-interface AnthropicModelInfo {
-  type: 'model';
-  id: string;
-  display_name: string;
-  created_at: string;
-}
-
-interface AnthropicListModelsResponse {
-  data: AnthropicModelInfo[];
-  has_more: boolean;
-  first_id: string | null;
-  last_id: string | null;
-}
+} from '../../utils/url';
 import {
   logResponseChunk,
   logResponseComplete,
   logResponseError,
   logResponseMetadata,
   startRequestLog,
-} from '../utils/logger';
+} from '../../utils/logger';
 
 /**
  * Client for Anthropic-compatible APIs
