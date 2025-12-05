@@ -291,10 +291,7 @@ async function manageModelList(
   for (;;) {
     const selection = await pickQuickItem<ModelListItem>({
       title: `Models (${options.providerLabel})`,
-      placeholder:
-        models.length === 0
-          ? 'Add models (optional)'
-          : 'Select a model to edit, or add a new one',
+      placeholder: 'Select a model to edit, or add a new one',
       ignoreFocusOut: true,
       items: buildModelListItems(models),
       onDidTriggerItemButton: async (event, qp) => {
@@ -509,7 +506,6 @@ function buildProviderListItems(store: ConfigStore): ProviderListItem[] {
   const items: ProviderListItem[] = [
     {
       label: '$(add) Add New Provider...',
-      description: 'Create a new provider',
       action: 'add',
       alwaysShow: true,
     },
@@ -541,10 +537,16 @@ function buildProviderFormItems(
 ): ProviderFormItem[] {
   const modelCount = draft.models.length;
   const items: ProviderFormItem[] = [
+    { label: '$(arrow-left) Back', action: 'cancel' },
     {
       label: '',
       kind: vscode.QuickPickItemKind.Separator,
-      description: 'Required Fields',
+      description: 'Primary Fields',
+    },
+    {
+      label: '$(tag) Name',
+      description: draft.name || '(required)',
+      field: 'name',
     },
     {
       label: '$(symbol-enum) API Format',
@@ -558,19 +560,19 @@ function buildProviderFormItems(
       field: 'type',
     },
     {
-      label: '$(tag) Name',
-      description: draft.name || '(required)',
-      field: 'name',
-    },
-    {
       label: '$(globe) API Base URL',
       description: draft.baseUrl || '(required)',
       field: 'baseUrl',
     },
     {
+      label: '$(key) API Key',
+      description: draft.apiKey ? '••••••••' : '(optional)',
+      field: 'apiKey',
+    },
+    {
       label: '',
       kind: vscode.QuickPickItemKind.Separator,
-      description: 'Optional Fields',
+      description: 'Other Fields',
     },
     {
       label: '$(symbol-misc) Models',
@@ -582,23 +584,16 @@ function buildProviderFormItems(
           : undefined,
       field: 'models',
     },
-    {
-      label: '$(key) API Key',
-      description: draft.apiKey ? '••••••••' : '(optional)',
-      field: 'apiKey',
-    },
     { label: '', kind: vscode.QuickPickItemKind.Separator },
     {
-      label: '$(check) Save Provider',
-      description: isEditing ? 'Update provider' : 'Save new provider',
+      label: '$(check) Save',
       action: 'confirm',
     },
-    { label: '$(close) Cancel', action: 'cancel' },
   ];
 
   if (isEditing) {
     items.push({
-      label: '$(trash) Delete Provider',
+      label: '$(trash) Delete',
       action: 'delete',
     });
   }
@@ -608,15 +603,15 @@ function buildProviderFormItems(
 
 function buildModelListItems(models: ModelConfig[]): ModelListItem[] {
   const items: ModelListItem[] = [
-    { label: '$(arrow-left) Done', action: 'back' },
+    { label: '$(arrow-left) Back', action: 'back' },
     { label: '$(add) Add Model...', action: 'add' },
+    {
+      label: '$(clippy) Add From Well-Known Model List...',
+      action: 'add-from-wellknown',
+    },
     {
       label: '$(cloud-download) Add From Official Model List...',
       action: 'add-from-official',
-    },
-    {
-      label: '$(list-unordered) Add From Well-Known Model List...',
-      action: 'add-from-wellknown',
     },
   ];
 
@@ -647,10 +642,11 @@ function buildModelFormItems(
   const defaultMaxOutputDescription = `optional, defaults: ${DEFAULT_MAX_OUTPUT_TOKENS.toLocaleString()}`;
 
   const items: ModelFormItem[] = [
+    { label: '$(arrow-left) Back', action: 'cancel' },
     {
       label: '',
       kind: vscode.QuickPickItemKind.Separator,
-      description: 'Required Fields',
+      description: 'Primary Fields',
     },
     {
       label: '$(tag) Model ID',
@@ -658,14 +654,14 @@ function buildModelFormItems(
       field: 'id',
     },
     {
-      label: '',
-      kind: vscode.QuickPickItemKind.Separator,
-      description: 'Optional Fields',
-    },
-    {
       label: '$(symbol-text) Display Name',
       description: draft.name || '(optional)',
       field: 'name',
+    },
+    {
+      label: '',
+      kind: vscode.QuickPickItemKind.Separator,
+      description: 'Detailed Fields',
     },
     {
       label: '$(arrow-down) Max Input Tokens',
@@ -681,15 +677,13 @@ function buildModelFormItems(
     },
     { label: '', kind: vscode.QuickPickItemKind.Separator },
     {
-      label: '$(check) Save Model',
-      description: 'Persist changes',
+      label: '$(check) Save',
       action: 'confirm',
     },
-    { label: '$(close) Cancel', action: 'cancel' },
   ];
 
   if (isEditing) {
-    items.push({ label: '$(trash) Delete Model', action: 'delete' });
+    items.push({ label: '$(trash) Delete', action: 'delete' });
   }
 
   return items;
@@ -949,6 +943,7 @@ async function showModelSelectionPicker(
         isLoading = false;
         qp.busy = false;
         qp.placeholder = 'Failed to load models';
+        qp.canSelectMany = false;
         qp.items = [
           { label: '$(arrow-left) Back', action: 'back' },
           { label: '', kind: vscode.QuickPickItemKind.Separator },

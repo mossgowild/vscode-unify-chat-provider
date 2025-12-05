@@ -34,4 +34,64 @@ export const WELL_KNOWN_MODELS: ModelConfig[] = [
       imageInput: true,
     },
   },
+  {
+    id: 'claude-opus-4-1',
+    name: 'Claude Opus 4.1',
+    maxInputTokens: 200000,
+    maxOutputTokens: 32000,
+    capabilities: {
+      toolCalling: true,
+      imageInput: true,
+    },
+  },
+  {
+    id: 'claude-sonnet-4',
+    name: 'Claude Sonnet 4',
+    maxInputTokens: 200000,
+    maxOutputTokens: 64000,
+    capabilities: {
+      toolCalling: true,
+      imageInput: true,
+    },
+  },
+  {
+    id: 'claude-3-7-sonnet',
+    name: 'Claude Sonnet 3.7',
+    maxInputTokens: 200000,
+    maxOutputTokens: 64000,
+    capabilities: {
+      toolCalling: true,
+      imageInput: true,
+    },
+  },
+  {
+    id: 'claude-opus-4',
+    name: 'Claude Opus 4',
+    maxInputTokens: 200000,
+    maxOutputTokens: 32000,
+    capabilities: {
+      toolCalling: true,
+      imageInput: true,
+    },
+  },
+  {
+    id: 'claude-3-5-haiku',
+    name: 'Claude Haiku 3.5',
+    maxInputTokens: 200000,
+    maxOutputTokens: 8000,
+    capabilities: {
+      toolCalling: true,
+      imageInput: true,
+    },
+  },
+  {
+    id: 'claude-3-haiku',
+    name: 'Claude Haiku 3',
+    maxInputTokens: 200000,
+    maxOutputTokens: 4000,
+    capabilities: {
+      toolCalling: true,
+      imageInput: true,
+    },
+  },
 ];
