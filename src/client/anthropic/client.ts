@@ -508,9 +508,10 @@ export class AnthropicProvider implements ApiProvider {
    * @param maxOutputTokens The max_tokens value for the request
    * @returns Safe budget value or undefined if thinking should be disabled
    */
-  private getThinkingBudget(
+  private normalizeThinkingBudget(
     configValue: number | undefined,
     maxOutputTokens: number,
+    interleavedThinkingEnabled: boolean,
   ): number {
     if (configValue === undefined) {
       configValue = 0;
@@ -520,7 +521,9 @@ export class AnthropicProvider implements ApiProvider {
     const normalizedBudget = configValue < 1024 ? 1024 : configValue;
 
     // Calculate safe value: min of (32000, maxOutputTokens - 1, normalizedBudget)
-    return Math.min(32000, maxOutputTokens - 1, normalizedBudget);
+    return interleavedThinkingEnabled
+      ? normalizedBudget
+      : Math.min(32000, maxOutputTokens - 1, normalizedBudget);
   }
 
   /**
@@ -538,7 +541,7 @@ export class AnthropicProvider implements ApiProvider {
     });
 
     const thinkingEnabled = model.thinking?.type === 'enabled';
-    const hasTools = options.tools && options.tools.length > 0;
+    const hasTools = (options.tools && options.tools.length > 0) ?? false;
     const interleavedThinkingSupported = isFeatureSupported(
       FeatureId.AnthropicInterleavedThinking,
       model.id,
@@ -634,9 +637,11 @@ export class AnthropicProvider implements ApiProvider {
           // For regular thinking, it must be less than max_tokens
           requestBody.thinking = {
             type,
-            budget_tokens: interleavedThinkingEnabled
-              ? budgetTokens ?? 1024 // Allow larger budgets with interleaved thinking
-              : this.getThinkingBudget(budgetTokens, requestBody.max_tokens),
+            budget_tokens: this.normalizeThinkingBudget(
+              budgetTokens,
+              requestBody.max_tokens,
+              interleavedThinkingEnabled,
+            ),
           };
         }
       }

@@ -127,4 +127,38 @@ export const WELL_KNOWN_MODELS: ModelConfig[] = [
       imageInput: true,
     },
   },
+  {
+    id: 'MiniMax-M2',
+    name: 'MiniMax-M2',
+    family: 'minimax-m2',
+    maxInputTokens: 204800,
+    maxOutputTokens: 64000,
+    stream: true,
+    thinking: {
+      type: 'enabled',
+      budgetTokens: 0,
+    },
+    interleavedThinking: true,
+    capabilities: {
+      toolCalling: true,
+      imageInput: false,
+    },
+  },
+  {
+    id: 'MiniMax-M2-Stable',
+    name: 'MiniMax-M2-Stable',
+    family: 'minimax-m2',
+    maxInputTokens: 204800,
+    maxOutputTokens: 64000,
+    stream: true,
+    thinking: {
+      type: 'enabled',
+      budgetTokens: 0,
+    },
+    interleavedThinking: true,
+    capabilities: {
+      toolCalling: true,
+      imageInput: false,
+    },
+  },
 ];
