@@ -135,6 +135,30 @@ export class AnthropicProvider implements ApiProvider {
         if (part.value.trim()) {
           blocks.push({ type: 'text', text: part.value });
         }
+      } else if (part instanceof vscode.LanguageModelThinkingPart) {
+        // Handle thinking parts from previous assistant responses
+        const metadata = part.metadata as
+          | {
+              redactedData?: string;
+              _completeThinking?: string;
+              signature?: string;
+            }
+          | undefined;
+        if (metadata?.redactedData) {
+          // Redacted thinking block
+          blocks.push({
+            type: 'redacted_thinking',
+            data: metadata.redactedData,
+          });
+        } else if (metadata?._completeThinking) {
+          // Complete thinking block with signature
+          blocks.push({
+            type: 'thinking',
+            thinking: metadata._completeThinking,
+            signature: metadata.signature || '',
+          });
+        }
+        // Skip incremental thinking parts - we only care about the complete one
       } else if (part instanceof vscode.LanguageModelToolCallPart) {
         blocks.push({
           type: 'tool_use',
@@ -209,11 +233,17 @@ export class AnthropicProvider implements ApiProvider {
           blocks.push({ type: 'text', text });
         } else {
           throw new Error(
-            `Unsupported mime type in LanguageModelDataPart: ${part.mimeType}`,
+            `Unsupported mime type in LanguageModelDataPart: ${
+              part.mimeType
+            }. Data length: ${part.data?.byteLength ?? 'unknown'}`,
           );
         }
       } else {
-        throw new Error('Unsupported message part type encountered');
+        throw new Error(
+          `Unsupported message part type encountered. Part details: ${JSON.stringify(
+            part,
+          )}.`,
+        );
       }
     }
 
@@ -234,6 +264,9 @@ export class AnthropicProvider implements ApiProvider {
         if (part.value.trim()) {
           blocks.push({ type: 'text', text: part.value });
         }
+      } else if (part instanceof vscode.LanguageModelThinkingPart) {
+        // Thinking parts should not appear in tool results, but skip them if they do
+        continue;
       } else if (part instanceof vscode.LanguageModelDataPart) {
         // Handle cache_control marker in tool results
         if (this.isCacheControlMarker(part)) {
@@ -278,11 +311,17 @@ export class AnthropicProvider implements ApiProvider {
           blocks.push({ type: 'text', text });
         } else {
           throw new Error(
-            `Unsupported mime type in LanguageModelDataPart: ${part.mimeType}`,
+            `Unsupported mime type in LanguageModelDataPart: ${
+              part.mimeType
+            }. Data length: ${part.data?.byteLength ?? 'unknown'}`,
           );
         }
       } else {
-        throw new Error('Unsupported tool result part type encountered');
+        throw new Error(
+          `Unsupported tool result part type encountered. Part details: ${JSON.stringify(
+            part,
+          )}.`,
+        );
       }
     }
 
