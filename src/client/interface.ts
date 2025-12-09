@@ -4,22 +4,8 @@ import type {
   LanguageModelResponsePart2,
   ProvideLanguageModelChatResponseOptions,
 } from 'vscode';
-import type { ProviderType } from '.';
+import type { Mimic, ProviderType } from '.';
 import { PerformanceTrace } from '../types';
-
-/**
- * Provider mimic options
- */
-export enum Mimic {
-  ClaudeCode = 'claude-code',
-}
-
-/**
- * Supported mimic options per provider
- */
-export const SUPPORT_MIMIC: Record<ProviderType, Mimic[]> = {
-  ['anthropic']: [Mimic.ClaudeCode],
-};
 
 /**
  * Configuration for a single provider endpoint
@@ -63,6 +49,12 @@ export interface ModelConfig {
   topK?: number;
   /** Top-p sampling */
   topP?: number;
+  /** Frequency penalty */
+  frequencyPenalty?: number;
+  /** Presence penalty */
+  presencePenalty?: number;
+  /** Parallel tool calling (true to enable, false to disable, undefined to use default) */
+  parallelToolCalling?: boolean;
   /** Thinking configuration */
   thinking?: {
     type: 'enabled' | 'disabled';
@@ -113,6 +105,7 @@ export interface ProviderDefinition {
   type: ProviderType;
   label: string;
   description: string;
+  supportMimics: Mimic[];
   class: new (config: ProviderConfig) => ApiProvider;
 }
 

@@ -13,13 +13,17 @@ import {
   validateBaseUrl,
 } from './validation';
 import { normalizeBaseUrlInput } from '../utils';
-import { createProvider, PROVIDERS, ProviderType } from '../client';
+import {
+  createProvider,
+  Mimic,
+  MIMIC_LABELS,
+  PROVIDERS,
+  ProviderType,
+} from '../client';
 import {
   ModelCapabilities,
   ModelConfig,
   ProviderConfig,
-  Mimic,
-  SUPPORT_MIMIC,
 } from '../client/interface';
 import { WELL_KNOWN_MODELS } from '../well-known-models';
 
@@ -30,10 +34,6 @@ type ProviderFormDraft = {
   apiKey?: string;
   mimic?: Mimic;
   models: ModelConfig[];
-};
-
-const MIMIC_LABELS: Record<Mimic, string> = {
-  [Mimic.ClaudeCode]: 'Claude Code',
 };
 
 type ProviderListItem = vscode.QuickPickItem & {
@@ -255,7 +255,7 @@ async function editProviderField(
         // Reset mimic if it is not supported by the newly selected provider type
         if (
           draft.mimic &&
-          !(SUPPORT_MIMIC[draft.type] ?? []).includes(draft.mimic)
+          !PROVIDERS[draft.type].supportMimics.includes(draft.mimic)
         ) {
           draft.mimic = undefined;
         }
@@ -303,7 +303,7 @@ async function editProviderField(
         break;
       }
 
-      const supported = SUPPORT_MIMIC[draft.type] ?? [];
+      const supported = PROVIDERS[draft.type].supportMimics;
       if (supported.length === 0) {
         vscode.window.showInformationMessage(
           'The selected provider type does not have any mimic options.',
@@ -718,6 +718,65 @@ async function editModelField(
       if (val !== undefined) draft.topP = val ? Number(val) : undefined;
       break;
     }
+    case 'parallelToolCalling': {
+      const picked = await pickQuickItem<
+        vscode.QuickPickItem & { value: boolean | undefined }
+      >({
+        title: 'Parallel Tool Calling',
+        placeholder: 'Enable or disable parallel tool calls',
+        items: [
+          {
+            label: 'Default',
+            description: 'Use provider default behavior',
+            value: undefined,
+          },
+          {
+            label: 'Enable',
+            description: 'Allow parallel tool calls',
+            value: true,
+          },
+          {
+            label: 'Disable',
+            description: 'Disallow parallel tool calls',
+            value: false,
+          },
+        ],
+      });
+      if (picked) draft.parallelToolCalling = picked.value;
+      break;
+    }
+    case 'frequencyPenalty': {
+      const val = await showInput({
+        prompt: 'Enter Frequency Penalty',
+        placeHolder: 'Leave blank for default',
+        value: draft.frequencyPenalty?.toString() || '',
+        validateInput: (v) => {
+          if (!v) return null;
+          const n = Number(v);
+          if (isNaN(n)) return 'Must be a number';
+          return null;
+        },
+      });
+      if (val !== undefined)
+        draft.frequencyPenalty = val ? Number(val) : undefined;
+      break;
+    }
+    case 'presencePenalty': {
+      const val = await showInput({
+        prompt: 'Enter Presence Penalty',
+        placeHolder: 'Leave blank for default',
+        value: draft.presencePenalty?.toString() || '',
+        validateInput: (v) => {
+          if (!v) return null;
+          const n = Number(v);
+          if (isNaN(n)) return 'Must be a number';
+          return null;
+        },
+      });
+      if (val !== undefined)
+        draft.presencePenalty = val ? Number(val) : undefined;
+      break;
+    }
     case 'thinking': {
       const picked = await pickQuickItem<
         vscode.QuickPickItem & { value: 'enabled' | 'disabled' | undefined }
@@ -970,6 +1029,16 @@ function buildModelFormItems(
       field: 'toolCalling',
     },
     {
+      label: '$(tools) Parallel Tool Calling',
+      description:
+        draft.parallelToolCalling === undefined
+          ? 'default'
+          : draft.parallelToolCalling
+          ? 'enable'
+          : 'disable',
+      field: 'parallelToolCalling',
+    },
+    {
       label: '$(file-media) Image Input Support',
       description: draft.capabilities?.imageInput ? 'Enabled' : 'Disabled',
       field: 'imageInput',
@@ -1017,6 +1086,22 @@ function buildModelFormItems(
       label: '$(circle) Top P',
       description: draft.topP === undefined ? 'default' : draft.topP.toString(),
       field: 'topP',
+    },
+    {
+      label: '$(circle) Frequency Penalty',
+      description:
+        draft.frequencyPenalty === undefined
+          ? 'default'
+          : draft.frequencyPenalty.toString(),
+      field: 'frequencyPenalty',
+    },
+    {
+      label: '$(circle) Presence Penalty',
+      description:
+        draft.presencePenalty === undefined
+          ? 'default'
+          : draft.presencePenalty.toString(),
+      field: 'presencePenalty',
     },
     { label: '', kind: vscode.QuickPickItemKind.Separator },
     {
@@ -1080,6 +1165,9 @@ function normalizeModelDraft(draft: ModelConfig): ModelConfig {
     temperature: draft.temperature,
     topK: draft.topK,
     topP: draft.topP,
+    parallelToolCalling: draft.parallelToolCalling,
+    frequencyPenalty: draft.frequencyPenalty,
+    presencePenalty: draft.presencePenalty,
     thinking: draft.thinking ? { ...draft.thinking } : undefined,
   };
 }
@@ -1096,6 +1184,9 @@ function cloneModels(models: ModelConfig[]): ModelConfig[] {
     temperature: m.temperature,
     topK: m.topK,
     topP: m.topP,
+    parallelToolCalling: m.parallelToolCalling,
+    frequencyPenalty: m.frequencyPenalty,
+    presencePenalty: m.presencePenalty,
     thinking: m.thinking ? { ...m.thinking } : undefined,
   }));
 }
@@ -1194,6 +1285,9 @@ function hasModelChanges(draft: ModelConfig, original?: ModelConfig): boolean {
   const temperature = draft.temperature;
   const topK = draft.topK;
   const topP = draft.topP;
+  const parallelToolCalling = draft.parallelToolCalling;
+  const frequencyPenalty = draft.frequencyPenalty;
+  const presencePenalty = draft.presencePenalty;
   const thinking = draft.thinking;
 
   if (!original) {
@@ -1208,6 +1302,9 @@ function hasModelChanges(draft: ModelConfig, original?: ModelConfig): boolean {
       temperature !== undefined ||
       topK !== undefined ||
       topP !== undefined ||
+      parallelToolCalling !== undefined ||
+      frequencyPenalty !== undefined ||
+      presencePenalty !== undefined ||
       thinking !== undefined
     );
   }
@@ -1223,6 +1320,9 @@ function hasModelChanges(draft: ModelConfig, original?: ModelConfig): boolean {
     temperature !== original.temperature ||
     topK !== original.topK ||
     topP !== original.topP ||
+    parallelToolCalling !== original.parallelToolCalling ||
+    frequencyPenalty !== original.frequencyPenalty ||
+    presencePenalty !== original.presencePenalty ||
     !thinkingEqual(thinking, original.thinking)
   );
 }
@@ -1246,6 +1346,9 @@ function modelsEqual(a: ModelConfig, b: ModelConfig): boolean {
     a.temperature === b.temperature &&
     a.topK === b.topK &&
     a.topP === b.topP &&
+    a.parallelToolCalling === b.parallelToolCalling &&
+    a.frequencyPenalty === b.frequencyPenalty &&
+    a.presencePenalty === b.presencePenalty &&
     thinkingEqual(a.thinking, b.thinking)
   );
 }

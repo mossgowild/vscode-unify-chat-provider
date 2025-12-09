@@ -119,10 +119,12 @@
                 "type": "string",
                 "description": "API format type. Determines how requests are formatted.",
                 "enum": [
-                  "anthropic"
+                  "anthropic",
+                  "openai-chat-completion"
                 ],
                 "enumDescriptions": [
-                  "Anthropic Messages API format"
+                  "Anthropic Messages API",
+                  "OpenAI Chat Completion API"
                 ]
               },
               "name": {
@@ -203,6 +205,10 @@
                             }
                           }
                         },
+                        "parallelToolCalling": {
+                          "type": "boolean",
+                          "description": "Enable or disable parallel tool calling (unset for provider default)."
+                        },
                         "stream": {
                           "type": "boolean",
                           "description": "Whether to stream the response."
@@ -218,6 +224,14 @@
                         "topP": {
                           "type": "number",
                           "description": "Top-p sampling."
+                        },
+                        "presencePenalty": {
+                          "type": "number",
+                          "description": "Presence penalty."
+                        },
+                        "frequencyPenalty": {
+                          "type": "number",
+                          "description": "Frequency penalty."
                         },
                         "thinking": {
                           "type": "object",
@@ -278,5 +292,8 @@
     "@types/node": "^22",
     "@types/vscode": "^1.104.0",
     "typescript": "^5.9.3"
+  },
+  "dependencies": {
+    "openai": "^6.10.0"
   }
 }

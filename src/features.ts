@@ -1,3 +1,5 @@
+import { ModelConfig } from './client/interface';
+
 export enum FeatureId {
   /**
    * @see https://platform.claude.com/docs/en/build-with-claude/extended-thinking#interleaved-thinking
@@ -15,6 +17,10 @@ export enum FeatureId {
    * @see https://docs.anthropic.com/en/docs/build-with-claude/tool-use/web-search-tool#citations
    */
   AnthropicCitations = 'anthropic_citations',
+  /**
+   * https://community.openai.com/t/developer-role-not-accepted-for-o1-o1-mini-o3-mini/1110750/7
+   */
+  OpenAIOnlyUseMaxCompletionTokens = 'openai_only-use-max-completion-tokens',
 }
 
 export interface Feature {
@@ -71,19 +77,42 @@ export const FEATURES: Record<FeatureId, Feature> = {
       'claude-opus-4',
     ],
   },
+  [FeatureId.OpenAIOnlyUseMaxCompletionTokens]: {
+    supportedFamilys: [
+      'codex-mini-latest',
+      'gpt-5.1',
+      'gpt-5.1-codex',
+      'gpt-5.1-codex-max',
+      'gpt-5.1-codex-mini',
+      'gpt-5',
+      'gpt-5-codex',
+      'gpt-5-mini',
+      'gpt-5-nano',
+      'gpt-5-pro',
+      'o1',
+      'o1-mini',
+      'o1-preview',
+      'o1-pro',
+      'o3',
+      'o3-deep-research',
+      'o3-mini',
+      'o3-pro',
+      'o4-mini',
+      'o4-mini-deep-research',
+      'gpt-oss-120b',
+      'gpt-oss-20b',
+    ],
+  },
 };
 
 /**
  * Check if a feature is supported by a specific model.
  * @param featureId The feature ID to check
- * @param modelId The model ID (e.g., 'claude-sonnet-4-20250514')
- * @param modelFamily The model family (e.g., 'claude-sonnet-4')
  * @returns true if the feature is supported by the model
  */
 export function isFeatureSupported(
   featureId: FeatureId,
-  modelId?: string,
-  modelFamily?: string,
+  model: ModelConfig,
 ): boolean {
   const feature = FEATURES[featureId];
   if (!feature) {
@@ -91,12 +120,12 @@ export function isFeatureSupported(
   }
 
   // Check if model ID is explicitly supported
-  if (modelId && feature.supportedModels?.includes(modelId)) {
+  if (model.id && feature.supportedModels?.includes(model.id)) {
     return true;
   }
 
   // Check if model family is supported
-  if (modelFamily && feature.supportedFamilys?.includes(modelFamily)) {
+  if (model.id && feature.supportedFamilys?.includes(model.id)) {
     return true;
   }
 

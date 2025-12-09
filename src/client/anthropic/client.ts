@@ -27,7 +27,7 @@ import {
   logInfo,
   startRequestLog,
 } from '../../logger';
-import { ApiProvider, ProviderConfig, ModelConfig, Mimic } from '../interface';
+import { ApiProvider, ProviderConfig, ModelConfig } from '../interface';
 import { normalizeBaseUrlInput } from '../../utils';
 import { DEFAULT_MAX_OUTPUT_TOKENS } from '../../defaults';
 import {
@@ -55,7 +55,7 @@ export class AnthropicProvider implements ApiProvider {
       'anthropic-version': '2023-06-01',
     };
 
-    if (this.config.mimic === Mimic.ClaudeCode) {
+    if (this.config.mimic === 'claude-code') {
       headers['Accept'] = 'application/json';
       headers['User-Agent'] = 'claude-cli/2.0.55 (external, cli)';
       headers['x-app'] = 'cli';
@@ -78,7 +78,7 @@ export class AnthropicProvider implements ApiProvider {
     const features = new Set(betaFeatures);
 
     // Ensure anthropic-beta is always present for Claude Code validation
-    if (this.config.mimic === Mimic.ClaudeCode) {
+    if (this.config.mimic === 'claude-code') {
       features.add('claude-code-20250219');
       features.add('interleaved-thinking-2025-05-14');
     }
@@ -482,14 +482,10 @@ export class AnthropicProvider implements ApiProvider {
 
     const memoryToolEnabled = model?.memoryTool === true;
     const memoryToolSupported = model
-      ? isFeatureSupported(
-          FeatureId.AnthropicMemoryTool,
-          model.id,
-          model.family,
-        )
+      ? isFeatureSupported(FeatureId.AnthropicMemoryTool, model)
       : false;
     const webSearchSupported = model
-      ? isFeatureSupported(FeatureId.AnthropicWebSearch, model.id, model.family)
+      ? isFeatureSupported(FeatureId.AnthropicWebSearch, model)
       : false;
 
     for (const tool of tools) {
@@ -561,6 +557,7 @@ export class AnthropicProvider implements ApiProvider {
     toolMode: vscode.LanguageModelChatToolMode,
     tools?: AnthropicToolUnion[],
     thinkingEnabled?: boolean,
+    parallelToolCalling?: boolean,
   ): AnthropicRequest['tool_choice'] | undefined {
     // When thinking is enabled, Claude only supports 'auto' and 'none' modes.
     // Using 'any' or 'tool' with thinking enabled will cause an API error.
@@ -569,10 +566,13 @@ export class AnthropicProvider implements ApiProvider {
       // If user requested Required mode, we fall back to 'auto' since 'any' and 'tool' are not supported
       if (toolMode === vscode.LanguageModelChatToolMode.Required) {
         // Cannot use 'any' or specific tool with thinking, use 'auto' as fallback
-        return { type: 'auto' };
+        return this.applyParallelToolChoice(
+          { type: 'auto' },
+          parallelToolCalling,
+        );
       }
       // For other modes, return undefined to use default 'auto' behavior
-      return undefined;
+      return this.applyParallelToolChoice(undefined, parallelToolCalling);
     }
 
     if (toolMode === vscode.LanguageModelChatToolMode.Required) {
@@ -583,13 +583,35 @@ export class AnthropicProvider implements ApiProvider {
       }
 
       if (tools.length === 1) {
-        return { type: 'tool', name: tools[0].name };
+        return this.applyParallelToolChoice(
+          { type: 'tool', name: tools[0].name },
+          parallelToolCalling,
+        );
       } else {
-        return { type: 'any' };
+        return this.applyParallelToolChoice(
+          { type: 'any' },
+          parallelToolCalling,
+        );
       }
     } else {
-      return undefined;
+      return this.applyParallelToolChoice(undefined, parallelToolCalling);
     }
+  }
+
+  private applyParallelToolChoice(
+    toolChoice: AnthropicRequest['tool_choice'] | undefined,
+    parallelToolCalling?: boolean,
+  ): AnthropicRequest['tool_choice'] | undefined {
+    if (parallelToolCalling === undefined) {
+      return toolChoice;
+    }
+
+    const base = toolChoice ?? { type: 'auto' as const };
+    return {
+      ...base,
+      disable_parallel_tool_use:
+        parallelToolCalling === false ? true : undefined,
+    };
   }
 
   /**
@@ -641,8 +663,7 @@ export class AnthropicProvider implements ApiProvider {
     const hasTools = (options.tools && options.tools.length > 0) ?? false;
     const interleavedThinkingSupported = isFeatureSupported(
       FeatureId.AnthropicInterleavedThinking,
-      model.id,
-      model.family,
+      model,
     );
     const interleavedThinkingEnabled =
       thinkingEnabled &&
@@ -688,6 +709,7 @@ export class AnthropicProvider implements ApiProvider {
       options.toolMode,
       tools,
       thinkingEnabled,
+      model.parallelToolCalling,
     );
 
     try {
@@ -698,7 +720,7 @@ export class AnthropicProvider implements ApiProvider {
         stream: true,
       };
 
-      if (this.config.mimic === Mimic.ClaudeCode) {
+      if (this.config.mimic === 'claude-code') {
         requestBody.metadata = {
           user_id: USER_ID,
         };

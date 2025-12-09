@@ -4,9 +4,9 @@ A VS Code extension that allows you to integrate multiple LLM API providers into
 
 ## Supported API Formats
 
-| Type        | Description                   | Example Providers                                                                         |
-| ----------- | ----------------------------- | ----------------------------------------------------------------------------------------- |
-| `anthropic` | Anthropic Messages API format | Anthropic, AWS Bedrock, Google Vertex AI, OpenRouter, and other Anthropic-compatible APIs |
+| Type        | Description            | Example Providers                                                                         |
+| ----------- | ---------------------- | ----------------------------------------------------------------------------------------- |
+| `anthropic` | Anthropic Messages API | Anthropic, AWS Bedrock, Google Vertex AI, OpenRouter, and other Anthropic-compatible APIs |
 
 More API formats will be added in future releases.
 
@@ -101,7 +101,7 @@ Models can be specified as simple strings or as objects with additional configur
 
 ### Anthropic Format (`type: "anthropic"`)
 
-Compatible with APIs that follow the Anthropic Messages API format:
+Compatible with APIs that follow the Anthropic Messages API:
 
 - **Endpoint**: POST to `<baseUrl>/v1/messages`
 - **Authentication**: `x-api-key` header

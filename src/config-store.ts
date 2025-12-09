@@ -4,10 +4,8 @@ import {
   ProviderConfig,
   ModelConfig,
   ModelCapabilities,
-  Mimic,
-  SUPPORT_MIMIC,
 } from './client/interface';
-import { PROVIDER_TYPES, ProviderType } from './client';
+import { Mimic, PROVIDER_TYPES, PROVIDERS, ProviderType } from './client';
 
 const CONFIG_NAMESPACE = 'unifyChatProvider';
 
@@ -107,7 +105,7 @@ export class ConfigStore {
     const type = obj.type as ProviderType;
 
     // Validate mimic option (optional, defaults to undefined)
-    const supportMimics = SUPPORT_MIMIC[type] ?? [];
+    const supportMimics = PROVIDERS[type].supportMimics;
     const rawMimic = obj.mimic;
     const mimic: Mimic | undefined =
       typeof rawMimic === 'string' && supportMimics.includes(rawMimic as Mimic)
@@ -169,6 +167,18 @@ export class ConfigStore {
             typeof obj.temperature === 'number' ? obj.temperature : undefined,
           topK: typeof obj.topK === 'number' ? obj.topK : undefined,
           topP: typeof obj.topP === 'number' ? obj.topP : undefined,
+          frequencyPenalty:
+            typeof obj.frequencyPenalty === 'number'
+              ? obj.frequencyPenalty
+              : undefined,
+          presencePenalty:
+            typeof obj.presencePenalty === 'number'
+              ? obj.presencePenalty
+              : undefined,
+          parallelToolCalling:
+            typeof obj.parallelToolCalling === 'boolean'
+              ? obj.parallelToolCalling
+              : undefined,
           thinking:
             obj.thinking && typeof obj.thinking === 'object'
               ? (obj.thinking as {

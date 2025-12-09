@@ -1,5 +1,5 @@
-import { ProviderType } from '../client';
-import { ModelConfig, Mimic, SUPPORT_MIMIC } from '../client/interface';
+import { Mimic, PROVIDERS, ProviderType } from '../client';
+import { ModelConfig } from '../client/interface';
 import { ConfigStore } from '../config-store';
 import { normalizeBaseUrlInput } from '../utils';
 
@@ -77,7 +77,7 @@ export function validateProviderForm(
     if (!data.type) {
       errors.push('Select an API Format before choosing a mimic option');
     } else {
-      const supported = SUPPORT_MIMIC[data.type] ?? [];
+      const supported = PROVIDERS[data.type].supportMimics;
       if (!supported.includes(data.mimic)) {
         errors.push(
           'The selected mimic is not supported by this provider type',
