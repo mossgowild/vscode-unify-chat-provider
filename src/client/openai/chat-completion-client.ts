@@ -15,7 +15,11 @@ import * as vscode from 'vscode';
 import type { RequestLogger } from '../../logger';
 import type { CompletionUsage } from 'openai/resources/completions';
 import { PerformanceTrace, CustomDataPartMimeTypes } from '../../types';
-import { normalizeBaseUrlInput } from '../../utils';
+import {
+  normalizeBaseUrlInput,
+  fetchWithRetry,
+  DEFAULT_RETRY_CONFIG,
+} from '../../utils';
 import { ApiProvider, ModelConfig, ProviderConfig } from '../interface';
 import { FeatureId, isFeatureSupported } from '../../features';
 import { WELL_KNOWN_MODELS } from '../../well-known-models';
@@ -35,16 +39,36 @@ type MessageContent = vscode.LanguageModelChatRequestMessage['content'][number];
 type ToolResultContent = vscode.LanguageModelToolResultPart['content'][number];
 
 export class OpenAIChatCompletionProvider implements ApiProvider {
-  private readonly client: OpenAI;
   private readonly baseUrl: string;
   private readonly endpoint: string;
 
   constructor(private readonly config: ProviderConfig) {
     this.baseUrl = this.buildBaseUrl(config.baseUrl);
     this.endpoint = `${this.baseUrl}/chat/completions`;
-    this.client = new OpenAI({
-      apiKey: config.apiKey,
+  }
+
+  /**
+   * Create an OpenAI client with custom fetch for retry support.
+   * A new client is created per request to enable per-request logging.
+   */
+  private createClient(logger?: RequestLogger): OpenAI {
+    const customFetch = (
+      input: RequestInfo | URL,
+      init?: RequestInit,
+    ): Promise<Response> => {
+      const url = typeof input === 'string' ? input : input.toString();
+      return fetchWithRetry(url, {
+        ...init,
+        logger,
+        retryConfig: DEFAULT_RETRY_CONFIG,
+      });
+    };
+
+    return new OpenAI({
+      apiKey: this.config.apiKey,
       baseURL: this.baseUrl,
+      maxRetries: 0, // Disable SDK's built-in retry - we use our own fetchWithRetry
+      fetch: customFetch,
     });
   }
 
@@ -646,14 +670,14 @@ export class OpenAIChatCompletionProvider implements ApiProvider {
 
     const usage: { value?: CompletionUsage } = {};
 
+    const client = this.createClient(logger);
+
     try {
       if (streamEnabled) {
         performanceTrace.ttf = Date.now() - performanceTrace.tts;
-        const streamResponse = await this.client.chat.completions.create(
+        const streamResponse = await client.chat.completions.create(
           streamingPayload,
-          {
-            signal: abortController.signal,
-          },
+          { signal: abortController.signal },
         );
         yield* this.handleStream(
           streamResponse as AsyncIterable<ChatCompletionChunk>,
@@ -665,7 +689,7 @@ export class OpenAIChatCompletionProvider implements ApiProvider {
         );
       } else {
         performanceTrace.ttf = Date.now() - performanceTrace.tts;
-        const response = await this.client.chat.completions.create(
+        const response = await client.chat.completions.create(
           nonStreamingPayload,
           { signal: abortController.signal },
         );
@@ -701,7 +725,8 @@ export class OpenAIChatCompletionProvider implements ApiProvider {
 
   async getAvailableModels(): Promise<ModelConfig[]> {
     const result: ModelConfig[] = [];
-    const page = await this.client.models.list();
+    const client = this.createClient();
+    const page = await client.models.list();
     for await (const model of page) {
       const wellKnwonConfig = WELL_KNOWN_MODELS.find((v) => v.id === model.id);
       result.push(Object.assign(wellKnwonConfig ?? {}, { id: model.id }));

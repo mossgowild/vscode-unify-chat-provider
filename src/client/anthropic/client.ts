@@ -21,7 +21,7 @@ import {
 } from './types';
 import type { RequestLogger } from '../../logger';
 import { ApiProvider, ProviderConfig, ModelConfig } from '../interface';
-import { normalizeBaseUrlInput } from '../../utils';
+import { normalizeBaseUrlInput, fetchWithRetry } from '../../utils';
 import { DEFAULT_MAX_OUTPUT_TOKENS } from '../../defaults';
 import {
   CustomDataPartMimeTypes,
@@ -775,13 +775,14 @@ export class AnthropicProvider implements ApiProvider {
 
       performanceTrace.ttf = Date.now() - performanceTrace.tts;
 
-      const response = await fetch(endpoint, {
+      const response = await fetchWithRetry(endpoint, {
         method: 'POST',
         headers,
         body: JSON.stringify(requestBody),
         signal: abortController.signal,
         keepalive: true,
         mode: 'cors',
+        logger,
       });
 
       logger.providerResponseMeta(response);
@@ -1188,7 +1189,7 @@ export class AnthropicProvider implements ApiProvider {
     try {
       do {
         const endpoint = toModelsUrl(this.config.baseUrl, afterId);
-        const response = await fetch(endpoint, {
+        const response = await fetchWithRetry(endpoint, {
           method: 'GET',
           headers,
           keepalive: true,

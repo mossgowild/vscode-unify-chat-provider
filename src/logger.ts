@@ -239,6 +239,21 @@ export class RequestLogger {
   }
 
   /**
+   * Log a retry attempt for retryable HTTP status codes.
+   * Always logged regardless of verbose setting.
+   */
+  retry(
+    attempt: number,
+    maxRetries: number,
+    statusCode: number,
+    delayMs: number,
+  ): void {
+    this.ch.warn(
+      `[${this.requestId}] ⟳ Retry ${attempt}/${maxRetries} after HTTP ${statusCode}, waiting ${delayMs}ms`,
+    );
+  }
+
+  /**
    * Log an error that occurred during the request.
    * This logs the provider context if not already logged.
    * Note: This should only be called when NOT re-throwing the error.
