@@ -14,10 +14,6 @@ export enum FeatureId {
    */
   AnthropicMemoryTool = 'anthropic_memory-tool',
   /**
-   * @see https://docs.anthropic.com/en/docs/build-with-claude/tool-use/web-search-tool#citations
-   */
-  AnthropicCitations = 'anthropic_citations',
-  /**
    * @see https://community.openai.com/t/developer-role-not-accepted-for-o1-o1-mini-o3-mini/1110750/7
    */
   OpenAIOnlyUseMaxCompletionTokens = 'openai_only-use-max-completion-tokens',
@@ -69,18 +65,6 @@ export const FEATURES: Record<FeatureId, Feature> = {
   [FeatureId.AnthropicMemoryTool]: {
     supportedFamilys: [
       'claude-sonnet-4-5',
-      'claude-opus-4-5',
-      'claude-opus-4-1',
-      'claude-opus-4',
-    ],
-  },
-  [FeatureId.AnthropicCitations]: {
-    supportedFamilys: [
-      'claude-sonnet-4-5',
-      'claude-sonnet-4',
-      'claude-sonnet-3-7',
-      'claude-haiku-4-5',
-      'claude-haiku-3-5',
       'claude-opus-4-5',
       'claude-opus-4-1',
       'claude-opus-4',

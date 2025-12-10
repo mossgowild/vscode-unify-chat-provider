@@ -12,13 +12,7 @@ import type {
   ChatCompletionCreateParamsBase,
 } from 'openai/resources/chat/completions';
 import * as vscode from 'vscode';
-import {
-  logResponseChunk,
-  logResponseComplete,
-  logResponseError,
-  startRequestLog,
-  logInfo,
-} from '../../logger';
+import type { RequestLogger } from '../../logger';
 import type { CompletionUsage } from 'openai/resources/completions';
 import { PerformanceTrace, CustomDataPartMimeTypes } from '../../types';
 import { normalizeBaseUrlInput } from '../../utils';
@@ -414,7 +408,6 @@ export class OpenAIChatCompletionProvider implements ApiProvider {
 
   private parseAndEmitToolCalls(
     toolStates: Map<number, ToolCallState>,
-    requestId: string,
     performanceTrace: PerformanceTrace,
     firstTokenRecorded: { value: boolean },
   ): vscode.LanguageModelResponsePart2[] {
@@ -440,12 +433,6 @@ export class OpenAIChatCompletionProvider implements ApiProvider {
         continue;
       }
     }
-    if (results.length > 0) {
-      logResponseChunk(
-        requestId,
-        `Emitting ${results.length} tool call(s) from accumulated arguments`,
-      );
-    }
     return results;
   }
 
@@ -453,7 +440,7 @@ export class OpenAIChatCompletionProvider implements ApiProvider {
     stream: AsyncIterable<ChatCompletionChunk>,
     performanceTrace: PerformanceTrace,
     token: vscode.CancellationToken,
-    requestId: string,
+    logger: RequestLogger,
     usage: { value?: CompletionUsage },
     emitReasoningContent: boolean,
   ): AsyncGenerator<vscode.LanguageModelResponsePart2> {
@@ -465,7 +452,7 @@ export class OpenAIChatCompletionProvider implements ApiProvider {
         break;
       }
 
-      logResponseChunk(requestId, JSON.stringify(chunk));
+      logger.providerResponseChunk(JSON.stringify(chunk));
       if (chunk.usage) {
         usage.value = chunk.usage;
       }
@@ -508,7 +495,6 @@ export class OpenAIChatCompletionProvider implements ApiProvider {
         if (toolStates.size > 0) {
           const emitted = this.parseAndEmitToolCalls(
             toolStates,
-            requestId,
             performanceTrace,
             firstTokenRecorded,
           );
@@ -523,11 +509,11 @@ export class OpenAIChatCompletionProvider implements ApiProvider {
   private async *handleNonStream(
     response: ChatCompletion,
     performanceTrace: PerformanceTrace,
-    requestId: string,
+    logger: RequestLogger,
     usage: { value?: CompletionUsage },
     emitReasoningContent: boolean,
   ): AsyncGenerator<vscode.LanguageModelResponsePart2> {
-    logResponseChunk(requestId, JSON.stringify(response));
+    logger.providerResponseChunk(JSON.stringify(response));
 
     if (response.usage) {
       usage.value = response.usage;
@@ -583,6 +569,7 @@ export class OpenAIChatCompletionProvider implements ApiProvider {
     options: vscode.ProvideLanguageModelChatResponseOptions,
     performanceTrace: PerformanceTrace,
     token: vscode.CancellationToken,
+    logger: RequestLogger,
   ): AsyncGenerator<vscode.LanguageModelResponsePart2> {
     const abortController = new AbortController();
     const cancellationListener = token.onCancellationRequested(() => {
@@ -649,7 +636,7 @@ export class OpenAIChatCompletionProvider implements ApiProvider {
       ? streamingPayload
       : nonStreamingPayload;
 
-    const requestId = startRequestLog({
+    logger.providerRequest({
       provider: this.config.name,
       modelId: model.id,
       endpoint: this.endpoint,
@@ -672,7 +659,7 @@ export class OpenAIChatCompletionProvider implements ApiProvider {
           streamResponse as AsyncIterable<ChatCompletionChunk>,
           performanceTrace,
           token,
-          requestId,
+          logger,
           usage,
           emitReasoningContent,
         );
@@ -685,7 +672,7 @@ export class OpenAIChatCompletionProvider implements ApiProvider {
         yield* this.handleNonStream(
           response,
           performanceTrace,
-          requestId,
+          logger,
           usage,
           emitReasoningContent,
         );
@@ -701,13 +688,8 @@ export class OpenAIChatCompletionProvider implements ApiProvider {
       }
 
       if (usage.value) {
-        logInfo(`[${requestId}] Usage: ${JSON.stringify(usage.value)}`);
+        logger.usage(usage.value);
       }
-
-      logResponseComplete(requestId);
-    } catch (error) {
-      logResponseError(requestId, error);
-      throw error;
     } finally {
       cancellationListener.dispose();
     }

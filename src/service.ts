@@ -6,7 +6,7 @@ import {
   DEFAULT_MAX_OUTPUT_TOKENS,
 } from './defaults';
 import { ApiProvider, ProviderConfig, ModelConfig } from './client/interface';
-import { logInfo } from './logger';
+import { createRequestLogger } from './logger';
 import { PerformanceTrace } from './types';
 
 export class UnifyChatService implements vscode.LanguageModelChatProvider {
@@ -141,6 +141,7 @@ export class UnifyChatService implements vscode.LanguageModelChatProvider {
     progress: vscode.Progress<vscode.LanguageModelResponsePart2>,
     token: vscode.CancellationToken,
   ): Promise<void> {
+    const logger = createRequestLogger();
     const performanceTrace: PerformanceTrace = {
       tts: Date.now(),
       tl: 0,
@@ -149,11 +150,8 @@ export class UnifyChatService implements vscode.LanguageModelChatProvider {
       ttft: 0,
     };
 
-    logInfo(`[Chat Request] Model: ${model.id}`);
-    logInfo(
-      `[Chat Request] Raw Messages: ${JSON.stringify(messages, null, 2)}`,
-    );
-    logInfo(`[Chat Request] Raw Options: ${JSON.stringify(options, null, 2)}`);
+    logger.start(model.id);
+    logger.vscodeInput(messages, options);
 
     const found = this.findProviderAndModel(model.id);
     if (!found) {
@@ -170,26 +168,20 @@ export class UnifyChatService implements vscode.LanguageModelChatProvider {
       options,
       performanceTrace,
       token,
+      logger,
     );
 
     for await (const part of stream) {
       if (token.isCancellationRequested) {
         break;
       }
-      logInfo(`[Chat Response] Chunk: ${JSON.stringify(part)}`);
+      // Log VSCode output (verbose only)
+      logger.vscodeOutput(part);
       progress.report(part);
     }
 
     performanceTrace.tl = Date.now() - performanceTrace.tts;
-    logInfo(
-      `[Chat Response] Performance trace: TimeToFetch: ${
-        performanceTrace.ttf
-      }ms, TimeToFirstToken: ${
-        performanceTrace.ttft
-      }ms, TokensPerSecond: ${performanceTrace.tps.toFixed(
-        1,
-      )}/s, TotalLatency: ${performanceTrace.tl}ms`,
-    );
+    logger.complete(performanceTrace);
   }
 
   /**

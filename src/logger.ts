@@ -1,20 +1,11 @@
 import * as vscode from 'vscode';
+import type { PerformanceTrace } from './types';
 
 const CHANNEL_NAME = 'Unify Chat Provider';
 
 let channel: vscode.LogOutputChannel | undefined;
 let nextRequestId = 1;
 let hasShownChannel = false;
-const requestContexts = new Map<
-  string,
-  {
-    label: string;
-    endpoint: string;
-    headers: Record<string, string>;
-    body: unknown;
-    logged: boolean;
-  }
->();
 
 /**
  * Lazily create and return the log output channel.
@@ -37,13 +28,6 @@ function isVerboseEnabled(): boolean {
   const config = vscode.workspace.getConfiguration('unifyChatProvider');
   const verbose = config.get<unknown>('verbose', false);
   return typeof verbose === 'boolean' ? verbose : false;
-}
-
-export function logInfo(message: string): void {
-  if (!isVerboseEnabled()) {
-    return;
-  }
-  getChannel().info(message);
 }
 
 function maskSensitiveHeaders(
@@ -74,102 +58,232 @@ function maskValue(value?: string): string {
 }
 
 /**
- * Log the outbound request details and return a request ID for correlation.
+ * A logger bound to a specific request ID for contextual logging.
+ *
+ * Logging rules:
+ * - Request start and complete are always logged (regardless of verbose setting)
+ * - Performance and usage info are always logged at complete
+ * - Detailed data (messages, options, request body, response chunks) only logged when verbose is enabled
+ * - Errors are NOT logged here (caller handles error logging before throwing)
  */
-export function startRequestLog(details: {
-  provider: string;
-  endpoint: string;
-  headers: Record<string, string>;
-  body: unknown;
-  modelId?: string;
-}): string {
-  const id = `req-${nextRequestId++}`;
+export class RequestLogger {
+  private readonly ch = getChannel();
+  private providerContext: {
+    label: string;
+    endpoint: string;
+    headers: Record<string, string>;
+    body: unknown;
+    logged: boolean;
+  } | null = null;
 
-  const maskedHeaders = maskSensitiveHeaders(details.headers);
-  const label = `${details.provider}${
-    details.modelId ? ` (${details.modelId})` : ''
-  }`;
-  requestContexts.set(id, {
-    label,
-    endpoint: details.endpoint,
-    headers: maskedHeaders,
-    body: details.body,
-    logged: false,
-  });
+  constructor(public readonly requestId: string) {}
 
-  if (isVerboseEnabled()) {
-    const ch = getChannel();
-    ch.info(`[${id}] → ${label} ${details.endpoint}`);
-    ch.info(`[${id}] Headers: ${JSON.stringify(maskedHeaders)}`);
-    ch.info(`[${id}] Body: ${JSON.stringify(details.body, null, 2)}`);
-    requestContexts.set(id, {
+  /**
+   * Log the start of a request. Always printed.
+   */
+  start(modelId: string): void {
+    this.ch.info(`[${this.requestId}] ▶ Request started for model: ${modelId}`);
+  }
+
+  /**
+   * Log the raw input received from VSCode.
+   * Only logged when verbose is enabled.
+   */
+  vscodeInput(
+    messages: readonly vscode.LanguageModelChatRequestMessage[],
+    options: vscode.ProvideLanguageModelChatResponseOptions,
+  ): void {
+    if (!isVerboseEnabled()) {
+      return;
+    }
+    this.ch.info(
+      `[${this.requestId}] VSCode Input Messages:\n${JSON.stringify(
+        messages,
+        null,
+        2,
+      )}`,
+    );
+    this.ch.info(
+      `[${this.requestId}] VSCode Input Options:\n${JSON.stringify(
+        options,
+        null,
+        2,
+      )}`,
+    );
+  }
+
+  /**
+   * Log the request being sent to the provider.
+   * Headers are always masked for sensitive values.
+   * Only logged when verbose is enabled, but context is saved for error logging.
+   */
+  providerRequest(details: {
+    provider: string;
+    endpoint: string;
+    headers: Record<string, string>;
+    body: unknown;
+    modelId?: string;
+  }): void {
+    const maskedHeaders = maskSensitiveHeaders(details.headers);
+    const label = `${details.provider}${
+      details.modelId ? ` (${details.modelId})` : ''
+    }`;
+
+    this.providerContext = {
       label,
       endpoint: details.endpoint,
       headers: maskedHeaders,
       body: details.body,
-      logged: true,
-    });
+      logged: false,
+    };
+
+    if (isVerboseEnabled()) {
+      this.ch.info(`[${this.requestId}] → ${label} ${details.endpoint}`);
+      this.ch.info(
+        `[${this.requestId}] Provider Request Headers:\n${JSON.stringify(
+          maskedHeaders,
+          null,
+          2,
+        )}`,
+      );
+      this.ch.info(
+        `[${this.requestId}] Provider Request Body:\n${JSON.stringify(
+          details.body,
+          null,
+          2,
+        )}`,
+      );
+      this.providerContext.logged = true;
+    }
   }
 
-  return id;
-}
+  /**
+   * Log provider response metadata (status, content-type).
+   * Always logged on error, otherwise only when verbose is enabled.
+   */
+  providerResponseMeta(response: Response): void {
+    const contentType = response.headers.get('content-type') ?? 'unknown';
+    const message = `[${this.requestId}] ← Status ${response.status} ${
+      response.statusText || ''
+    } (${contentType})`.trim();
 
-function logRequestContext(requestId: string): void {
-  const ctx = requestContexts.get(requestId);
-  if (!ctx || ctx.logged) {
-    return;
+    if (!response.ok) {
+      this.logProviderContext();
+      this.ch.error(message);
+      return;
+    }
+
+    if (isVerboseEnabled()) {
+      this.ch.info(message);
+    }
   }
 
-  const ch = getChannel();
-  ch.error(`[${requestId}] → ${ctx.label} ${ctx.endpoint}`);
-  ch.error(`[${requestId}] Headers: ${JSON.stringify(ctx.headers)}`);
-  ch.error(`[${requestId}] Body: ${JSON.stringify(ctx.body, null, 2)}`);
-  ctx.logged = true;
-  requestContexts.set(requestId, ctx);
-}
-
-/**
- * Log HTTP status and content type metadata.
- */
-export function logResponseMetadata(
-  requestId: string,
-  response: Response,
-): void {
-  const contentType = response.headers.get('content-type') ?? 'unknown';
-  const message = `[${requestId}] ← Status ${response.status} ${
-    response.statusText || ''
-  } (${contentType})`.trim();
-
-  if (!response.ok) {
-    logRequestContext(requestId);
-    getChannel().error(message);
-    return;
+  /**
+   * Log a raw response chunk from the provider.
+   * Only logged when verbose is enabled.
+   */
+  providerResponseChunk(data: string): void {
+    if (!isVerboseEnabled()) {
+      return;
+    }
+    this.ch.info(`[${this.requestId}] ⇦ ${data}`);
   }
 
-  logInfo(message);
+  /**
+   * Log a part being sent to VSCode.
+   * Only logged when verbose is enabled.
+   */
+  vscodeOutput(part: vscode.LanguageModelResponsePart2): void {
+    if (!isVerboseEnabled()) {
+      return;
+    }
+    this.ch.info(`[${this.requestId}] VSCode Output: ${JSON.stringify(part)}`);
+  }
+
+  /**
+   * Log verbose information. Only logged when verbose is enabled.
+   */
+  verbose(message: string): void {
+    if (!isVerboseEnabled()) {
+      return;
+    }
+    this.ch.info(`[${this.requestId}] ${message}`);
+  }
+
+  /**
+   * Log usage information from provider. Always logged.
+   * @param usage Raw usage object from provider (will be JSON stringified)
+   */
+  usage(usage: unknown): void {
+    this.ch.info(`[${this.requestId}] Usage: ${JSON.stringify(usage)}`);
+  }
+
+  /**
+   * Log request completion with performance metrics.
+   * Always logged regardless of verbose setting.
+   */
+  complete(performanceTrace: PerformanceTrace): void {
+    const perfInfo = [
+      `Time to Fetch: ${performanceTrace.ttf}ms`,
+      `Time to First Token: ${performanceTrace.ttft}ms`,
+      `Tokens Per Second: ${
+        isNaN(performanceTrace.tps)
+          ? 'N/A'
+          : performanceTrace.tps.toFixed(1) + '/s'
+      }`,
+      `Total Latency: ${performanceTrace.tl}ms`,
+    ].join(', ');
+
+    this.ch.info(`[${this.requestId}] ✓ Request completed | ${perfInfo}`);
+    this.providerContext = null;
+  }
+
+  /**
+   * Log an error that occurred during the request.
+   * This logs the provider context if not already logged.
+   * Note: This should only be called when NOT re-throwing the error.
+   * If re-throwing, let the caller handle error logging.
+   */
+  error(error: unknown): void {
+    this.logProviderContext();
+    const message = error instanceof Error ? error.message : String(error);
+    this.ch.error(`[${this.requestId}] ✕ ${message}`);
+    this.providerContext = null;
+  }
+
+  /**
+   * Log the provider context (request details) when an error occurs.
+   * Only logs if not already logged.
+   */
+  private logProviderContext(): void {
+    if (!this.providerContext || this.providerContext.logged) {
+      return;
+    }
+
+    const ctx = this.providerContext;
+    this.ch.error(`[${this.requestId}] → ${ctx.label} ${ctx.endpoint}`);
+    this.ch.error(
+      `[${this.requestId}] Provider Request Headers:\n${JSON.stringify(
+        ctx.headers,
+        null,
+        2,
+      )}`,
+    );
+    this.ch.error(
+      `[${this.requestId}] Provider Request Body:\n${JSON.stringify(
+        ctx.body,
+        null,
+        2,
+      )}`,
+    );
+    ctx.logged = true;
+  }
 }
 
 /**
- * Log a raw response chunk (SSE line or full JSON body).
+ * Create a new RequestLogger with a unique request ID.
  */
-export function logResponseChunk(requestId: string, data: string): void {
-  logInfo(`[${requestId}] ⇦ ${data}`);
-}
-
-/**
- * Log request completion marker.
- */
-export function logResponseComplete(requestId: string): void {
-  logInfo(`[${requestId}] ✓ completed`);
-  requestContexts.delete(requestId);
-}
-
-/**
- * Log a request error.
- */
-export function logResponseError(requestId: string, error: unknown): void {
-  logRequestContext(requestId);
-  const message = error instanceof Error ? error.message : String(error);
-  getChannel().error(`[${requestId}] ✕ ${message}`);
-  requestContexts.delete(requestId);
+export function createRequestLogger(): RequestLogger {
+  const id = `req-${nextRequestId++}`;
+  return new RequestLogger(id);
 }

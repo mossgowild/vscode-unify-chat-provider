@@ -19,14 +19,7 @@ import {
   AnthropicTextBlockWithCitations,
   AnthropicUsage,
 } from './types';
-import {
-  logResponseChunk,
-  logResponseComplete,
-  logResponseError,
-  logResponseMetadata,
-  logInfo,
-  startRequestLog,
-} from '../../logger';
+import type { RequestLogger } from '../../logger';
 import { ApiProvider, ProviderConfig, ModelConfig } from '../interface';
 import { normalizeBaseUrlInput } from '../../utils';
 import { DEFAULT_MAX_OUTPUT_TOKENS } from '../../defaults';
@@ -654,6 +647,7 @@ export class AnthropicProvider implements ApiProvider {
     options: vscode.ProvideLanguageModelChatResponseOptions,
     performanceTrace: PerformanceTrace,
     token: vscode.CancellationToken,
+    logger: RequestLogger,
   ): AsyncGenerator<vscode.LanguageModelResponsePart2> {
     const abortController = new AbortController();
     const cancellationListener = token.onCancellationRequested(() => {
@@ -673,7 +667,6 @@ export class AnthropicProvider implements ApiProvider {
       interleavedThinkingSupported;
 
     const endpoint = toMessagesUrl(this.config.baseUrl);
-    let requestId = 'req-unknown';
 
     const { system, messages: anthropicMessages } =
       this.convertMessages(messages);
@@ -772,7 +765,7 @@ export class AnthropicProvider implements ApiProvider {
         }
       }
 
-      requestId = startRequestLog({
+      logger.providerRequest({
         provider: this.config.name,
         modelId: model.id,
         endpoint,
@@ -791,11 +784,10 @@ export class AnthropicProvider implements ApiProvider {
         mode: 'cors',
       });
 
-      logResponseMetadata(requestId, response);
+      logger.providerResponseMeta(response);
 
       if (!response.ok) {
         const errorText = await response.text();
-        logResponseError(requestId, `HTTP ${response.status}: ${errorText}`);
         throw new Error(
           `API request failed (${response.status}): ${errorText}`,
         );
@@ -809,14 +801,14 @@ export class AnthropicProvider implements ApiProvider {
         yield* this.parseSSEStream(
           response,
           token,
-          requestId,
+          logger,
           (usage = {} as AnthropicUsage),
           performanceTrace,
         );
       } else {
         // Non-streaming response fallback
         const rawText = await response.text();
-        logResponseChunk(requestId, rawText);
+        logger.providerResponseChunk(rawText);
         const result = JSON.parse(rawText);
 
         usage = (result as { usage?: AnthropicUsage }).usage;
@@ -886,14 +878,8 @@ export class AnthropicProvider implements ApiProvider {
       }
 
       if (usage) {
-        logInfo(`[${requestId}] Usage: ${JSON.stringify(usage)}`);
+        logger.usage(usage);
       }
-
-      logResponseComplete(requestId);
-    } catch (error) {
-      // Errors are logged before being rethrown so the UI still handles them.
-      logResponseError(requestId, error);
-      throw error;
     } finally {
       cancellationListener.dispose();
     }
@@ -905,7 +891,7 @@ export class AnthropicProvider implements ApiProvider {
   private async *parseSSEStream(
     response: Response,
     token: vscode.CancellationToken,
-    requestId: string,
+    logger: RequestLogger,
     usage: AnthropicUsage,
     performanceTrace: PerformanceTrace,
   ): AsyncGenerator<vscode.LanguageModelResponsePart2> {
@@ -978,7 +964,7 @@ export class AnthropicProvider implements ApiProvider {
           }
 
           const data = trimmed.slice(5).trim();
-          logResponseChunk(requestId, data);
+          logger.providerResponseChunk(data);
           if (data === '[DONE]') {
             return;
           }

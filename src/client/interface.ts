@@ -5,7 +5,8 @@ import type {
   ProvideLanguageModelChatResponseOptions,
 } from 'vscode';
 import type { Mimic, ProviderType } from '.';
-import { PerformanceTrace } from '../types';
+import type { PerformanceTrace } from '../types';
+import type { RequestLogger } from '../logger';
 
 /**
  * Configuration for a single provider endpoint
@@ -131,6 +132,7 @@ export interface ApiProvider {
     options: ProvideLanguageModelChatResponseOptions,
     performanceTrace: PerformanceTrace,
     token: CancellationToken,
+    logger: RequestLogger,
   ): AsyncGenerator<LanguageModelResponsePart2>;
 
   /**

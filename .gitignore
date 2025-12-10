@@ -4,6 +4,7 @@ out-tests
 .vscode-test
 *.vsix
 npm-debug.log*
+scripts/claude-proxy.log
 
 # Environment variables with sensitive credentials
 .env
