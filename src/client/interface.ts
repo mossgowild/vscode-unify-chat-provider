@@ -55,10 +55,19 @@ export interface ModelConfig {
   presencePenalty?: number;
   /** Parallel tool calling (true to enable, false to disable, undefined to use default) */
   parallelToolCalling?: boolean;
+  /**
+   * Constrains response verbosity. Lower = concise, higher = verbose.
+   * Supported values: low | medium | high.
+   */
+  verbosity?: 'low' | 'medium' | 'high';
   /** Thinking configuration */
   thinking?: {
     type: 'enabled' | 'disabled';
     budgetTokens?: number;
+    /**
+     * Thinking effort level. Leave undefined to let the provider decide.
+     */
+    effort?: 'none' | 'minimal' | 'low' | 'medium' | 'high' | 'xhigh';
   };
   /**
    * Enable interleaved thinking for tool use.

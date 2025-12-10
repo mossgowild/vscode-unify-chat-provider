@@ -233,6 +233,20 @@
                           "type": "number",
                           "description": "Frequency penalty."
                         },
+                        "verbosity": {
+                          "type": "string",
+                          "description": "Constrains response verbosity (low=concise, high=verbose).",
+                          "enum": [
+                            "low",
+                            "medium",
+                            "high"
+                          ],
+                          "enumDescriptions": [
+                            "More concise responses.",
+                            "Balanced verbosity.",
+                            "More verbose responses."
+                          ]
+                        },
                         "thinking": {
                           "type": "object",
                           "description": "Thinking configuration.",
@@ -245,12 +259,31 @@
                                 },
                                 "budgetTokens": {
                                   "type": "integer",
-                                  "description": "Token budget for thinking (required when enabled)."
+                                  "description": "Token budget for thinking."
+                                },
+                                "effort": {
+                                  "type": "string",
+                                  "description": "Thinking effort level (leave blank to let the provider decide).",
+                                  "enum": [
+                                    "none",
+                                    "minimal",
+                                    "low",
+                                    "medium",
+                                    "high",
+                                    "xhigh"
+                                  ],
+                                  "enumDescriptions": [
+                                    "No thinking effort.",
+                                    "Minimal thinking effort.",
+                                    "Low thinking effort.",
+                                    "Medium thinking effort.",
+                                    "High thinking effort.",
+                                    "Extra high thinking effort."
+                                  ]
                                 }
                               },
                               "required": [
-                                "type",
-                                "budgetTokens"
+                                "type"
                               ]
                             },
                             {

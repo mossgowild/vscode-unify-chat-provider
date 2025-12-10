@@ -175,16 +175,48 @@ export class ConfigStore {
             typeof obj.presencePenalty === 'number'
               ? obj.presencePenalty
               : undefined,
+          verbosity:
+            obj.verbosity === 'low' ||
+            obj.verbosity === 'medium' ||
+            obj.verbosity === 'high'
+              ? obj.verbosity
+              : undefined,
           parallelToolCalling:
             typeof obj.parallelToolCalling === 'boolean'
               ? obj.parallelToolCalling
               : undefined,
           thinking:
             obj.thinking && typeof obj.thinking === 'object'
-              ? (obj.thinking as {
-                  type: 'enabled' | 'disabled';
-                  budgetTokens?: number;
-                })
+              ? (() => {
+                  const thinking = obj.thinking as Record<string, unknown>;
+                  const effort =
+                    thinking.effort === 'none' ||
+                    thinking.effort === 'minimal' ||
+                    thinking.effort === 'low' ||
+                    thinking.effort === 'medium' ||
+                    thinking.effort === 'high' ||
+                    thinking.effort === 'xhigh'
+                      ? thinking.effort
+                      : undefined;
+
+                  const type =
+                    thinking.type === 'enabled' || thinking.type === 'disabled'
+                      ? thinking.type
+                      : undefined;
+
+                  if (!type) {
+                    return undefined;
+                  }
+
+                  return {
+                    type,
+                    budgetTokens:
+                      typeof thinking.budgetTokens === 'number'
+                        ? thinking.budgetTokens
+                        : undefined,
+                    effort,
+                  };
+                })()
               : undefined,
         };
       }

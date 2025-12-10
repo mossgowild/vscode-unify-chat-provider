@@ -157,4 +157,30 @@ export const WELL_KNOWN_MODELS: ModelConfig[] = [
       imageInput: false,
     },
   },
+  {
+    id: 'deepseek-chat',
+    name: 'DeepSeek Chat',
+    maxInputTokens: 128000,
+    maxOutputTokens: 8000,
+    stream: true,
+    capabilities: {
+      toolCalling: true,
+      imageInput: false,
+    },
+  },
+  {
+    id: 'deepseek-reasoner',
+    name: 'DeepSeek Reasoner',
+    maxInputTokens: 128000,
+    maxOutputTokens: 64000,
+    stream: true,
+    thinking: {
+      type: 'enabled',
+    },
+    interleavedThinking: true,
+    capabilities: {
+      toolCalling: true,
+      imageInput: false,
+    },
+  },
 ];

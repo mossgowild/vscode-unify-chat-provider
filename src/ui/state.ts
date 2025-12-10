@@ -777,6 +777,40 @@ async function editModelField(
         draft.presencePenalty = val ? Number(val) : undefined;
       break;
     }
+    case 'verbosity': {
+      const picked = await pickQuickItem<
+        vscode.QuickPickItem & { value: ModelConfig['verbosity'] }
+      >({
+        title: 'Verbosity',
+        placeholder: 'Choose response verbosity',
+        items: [
+          {
+            label: 'Default',
+            description: 'Use provider default',
+            value: undefined,
+          },
+          {
+            label: 'Low',
+            description: 'More concise responses',
+            value: 'low',
+          },
+          {
+            label: 'Medium',
+            description: 'Balanced verbosity',
+            value: 'medium',
+          },
+          {
+            label: 'High',
+            description: 'More verbose responses',
+            value: 'high',
+          },
+        ],
+      });
+      if (picked) {
+        draft.verbosity = picked.value;
+      }
+      break;
+    }
     case 'thinking': {
       const picked = await pickQuickItem<
         vscode.QuickPickItem & { value: 'enabled' | 'disabled' | undefined }
@@ -815,9 +849,65 @@ async function editModelField(
           value: draft.thinking?.budgetTokens?.toString(),
           validateInput: validatePositiveIntegerOrEmpty,
         });
+
+        const effort = await pickQuickItem<
+          vscode.QuickPickItem & {
+            value:
+              | 'none'
+              | 'minimal'
+              | 'low'
+              | 'medium'
+              | 'high'
+              | 'xhigh'
+              | undefined;
+          }
+        >({
+          title: 'Thinking Effort',
+          placeholder: 'Select thinking effort (optional)',
+          items: [
+            {
+              label: 'Default',
+              description: 'Let the provider decide',
+              value: undefined,
+              picked: draft.thinking?.effort === undefined,
+            },
+            {
+              label: 'None',
+              value: 'none',
+              picked: draft.thinking?.effort === 'none',
+            },
+            {
+              label: 'Minimal',
+              value: 'minimal',
+              picked: draft.thinking?.effort === 'minimal',
+            },
+            {
+              label: 'Low',
+              value: 'low',
+              picked: draft.thinking?.effort === 'low',
+            },
+            {
+              label: 'Medium',
+              value: 'medium',
+              picked: draft.thinking?.effort === 'medium',
+            },
+            {
+              label: 'High',
+              value: 'high',
+              picked: draft.thinking?.effort === 'high',
+            },
+            {
+              label: 'Extra High',
+              value: 'xhigh',
+              picked: draft.thinking?.effort === 'xhigh',
+            },
+          ],
+        });
+
         draft.thinking = {
           type: 'enabled',
           budgetTokens: budgetStr ? Number(budgetStr) : undefined,
+          effort: effort ? effort.value : undefined,
         };
       }
       break;
@@ -992,7 +1082,7 @@ function buildModelFormItems(
       field: 'name',
     },
     {
-      label: '$(versions) Model Family',
+      label: '$(preserve-case) Model Family',
       description: draft.family || '(optional)',
       field: 'family',
     },
@@ -1029,7 +1119,7 @@ function buildModelFormItems(
       field: 'toolCalling',
     },
     {
-      label: '$(tools) Parallel Tool Calling',
+      label: '$(group-by-ref-type) Parallel Tool Calling',
       description:
         draft.parallelToolCalling === undefined
           ? 'default'
@@ -1044,7 +1134,7 @@ function buildModelFormItems(
       field: 'imageInput',
     },
     {
-      label: '$(fold-down) Stream',
+      label: '$(diff-renamed) Stream',
       description:
         draft.stream === undefined
           ? 'default'
@@ -1058,11 +1148,25 @@ function buildModelFormItems(
       description: draft.thinking
         ? `${draft.thinking.type}${
             draft.thinking.type === 'enabled'
-              ? ` (${draft.thinking.budgetTokens} tokens)`
+              ? (() => {
+                  const details: string[] = [];
+                  if (draft.thinking!.budgetTokens !== undefined) {
+                    details.push(`${draft.thinking!.budgetTokens} tokens`);
+                  }
+                  if (draft.thinking!.effort) {
+                    details.push(`${draft.thinking!.effort} effort`);
+                  }
+                  return details.length > 0 ? ` (${details.join(', ')})` : '';
+                })()
               : ''
           }`
         : 'default',
       field: 'thinking',
+    },
+    {
+      label: '$(code-review) Verbosity',
+      description: draft.verbosity === undefined ? 'default' : draft.verbosity,
+      field: 'verbosity',
     },
     {
       label: '',
@@ -1165,6 +1269,7 @@ function normalizeModelDraft(draft: ModelConfig): ModelConfig {
     temperature: draft.temperature,
     topK: draft.topK,
     topP: draft.topP,
+    verbosity: draft.verbosity,
     parallelToolCalling: draft.parallelToolCalling,
     frequencyPenalty: draft.frequencyPenalty,
     presencePenalty: draft.presencePenalty,
@@ -1184,6 +1289,7 @@ function cloneModels(models: ModelConfig[]): ModelConfig[] {
     temperature: m.temperature,
     topK: m.topK,
     topP: m.topP,
+    verbosity: m.verbosity,
     parallelToolCalling: m.parallelToolCalling,
     frequencyPenalty: m.frequencyPenalty,
     presencePenalty: m.presencePenalty,
@@ -1270,7 +1376,11 @@ function thinkingEqual(
 ): boolean {
   if (a === b) return true;
   if (!a || !b) return false;
-  return a.type === b.type && a.budgetTokens === b.budgetTokens;
+  return (
+    a.type === b.type &&
+    a.budgetTokens === b.budgetTokens &&
+    a.effort === b.effort
+  );
 }
 
 function hasModelChanges(draft: ModelConfig, original?: ModelConfig): boolean {
@@ -1285,6 +1395,7 @@ function hasModelChanges(draft: ModelConfig, original?: ModelConfig): boolean {
   const temperature = draft.temperature;
   const topK = draft.topK;
   const topP = draft.topP;
+  const verbosity = draft.verbosity;
   const parallelToolCalling = draft.parallelToolCalling;
   const frequencyPenalty = draft.frequencyPenalty;
   const presencePenalty = draft.presencePenalty;
@@ -1302,6 +1413,7 @@ function hasModelChanges(draft: ModelConfig, original?: ModelConfig): boolean {
       temperature !== undefined ||
       topK !== undefined ||
       topP !== undefined ||
+      verbosity !== undefined ||
       parallelToolCalling !== undefined ||
       frequencyPenalty !== undefined ||
       presencePenalty !== undefined ||
@@ -1320,6 +1432,7 @@ function hasModelChanges(draft: ModelConfig, original?: ModelConfig): boolean {
     temperature !== original.temperature ||
     topK !== original.topK ||
     topP !== original.topP ||
+    verbosity !== original.verbosity ||
     parallelToolCalling !== original.parallelToolCalling ||
     frequencyPenalty !== original.frequencyPenalty ||
     presencePenalty !== original.presencePenalty ||
@@ -1346,6 +1459,7 @@ function modelsEqual(a: ModelConfig, b: ModelConfig): boolean {
     a.temperature === b.temperature &&
     a.topK === b.topK &&
     a.topP === b.topP &&
+    a.verbosity === b.verbosity &&
     a.parallelToolCalling === b.parallelToolCalling &&
     a.frequencyPenalty === b.frequencyPenalty &&
     a.presencePenalty === b.presencePenalty &&

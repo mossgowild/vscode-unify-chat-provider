@@ -1063,22 +1063,9 @@ export class AnthropicProvider implements ApiProvider {
                 yield new vscode.LanguageModelTextPart(event.delta.text);
               } else if (event.delta.type === 'input_json_delta') {
                 // Handle input_json_delta for both regular tool_use and server_tool_use
+                recordFirstToken();
                 if (currentToolCall) {
                   currentToolCall.inputJson += event.delta.partial_json;
-                  // Try progressive JSON parsing - emit tool call as soon as JSON is complete
-                  try {
-                    const parsedJson = JSON.parse(currentToolCall.inputJson);
-                    recordFirstToken();
-                    yield new vscode.LanguageModelToolCallPart(
-                      currentToolCall.id,
-                      currentToolCall.name,
-                      parsedJson,
-                    );
-                    // Clear the tool call state since we've emitted it
-                    currentToolCall = null;
-                  } catch {
-                    // JSON is not complete yet, continue accumulating
-                  }
                 } else if (currentServerToolUse) {
                   currentServerToolUse.inputJson += event.delta.partial_json;
                 }

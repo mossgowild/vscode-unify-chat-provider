@@ -17,7 +17,9 @@ import {
   logResponseComplete,
   logResponseError,
   startRequestLog,
+  logInfo,
 } from '../../logger';
+import type { CompletionUsage } from 'openai/resources/completions';
 import { PerformanceTrace, CustomDataPartMimeTypes } from '../../types';
 import { normalizeBaseUrlInput } from '../../utils';
 import { ApiProvider, ModelConfig, ProviderConfig } from '../interface';
@@ -179,12 +181,17 @@ export class OpenAIChatCompletionProvider implements ApiProvider {
     return content;
   }
 
-  private convertAssistantParts(parts: readonly MessageContent[]): {
+  private convertAssistantParts(
+    parts: readonly MessageContent[],
+    includeReasoningContent: boolean,
+  ): {
     content: OpenAITextContentPart[];
     toolCalls: ChatCompletionMessageToolCall[];
+    reasoningContent?: string;
   } {
     const content: OpenAITextContentPart[] = [];
     const toolCalls: ChatCompletionMessageToolCall[] = [];
+    const reasoningParts: string[] = [];
 
     for (const part of parts) {
       if (part instanceof vscode.LanguageModelToolCallPart) {
@@ -197,6 +204,11 @@ export class OpenAIChatCompletionProvider implements ApiProvider {
           },
         });
       } else if (part instanceof vscode.LanguageModelThinkingPart) {
+        if (includeReasoningContent) {
+          reasoningParts.push(
+            ...(Array.isArray(part.value) ? part.value : [part.value]),
+          );
+        }
         continue;
       } else if (part instanceof vscode.LanguageModelToolResultPart) {
         continue;
@@ -205,7 +217,14 @@ export class OpenAIChatCompletionProvider implements ApiProvider {
       }
     }
 
-    return { content, toolCalls };
+    return {
+      content,
+      toolCalls,
+      reasoningContent:
+        includeReasoningContent && reasoningParts.length > 0
+          ? reasoningParts.join('\n')
+          : undefined,
+    };
   }
 
   private convertUserMessageParts(parts: readonly MessageContent[]): {
@@ -242,6 +261,13 @@ export class OpenAIChatCompletionProvider implements ApiProvider {
         chunks.push(part.value);
       } else if (part instanceof vscode.LanguageModelDataPart) {
         if (
+          part.mimeType === CustomDataPartMimeTypes.CacheControl ||
+          part.mimeType === CustomDataPartMimeTypes.StatefulMarker ||
+          part.mimeType === CustomDataPartMimeTypes.ThinkingData
+        ) {
+          continue;
+        }
+        if (
           part.mimeType.startsWith('text/') ||
           part.mimeType === 'application/json' ||
           part.mimeType.endsWith('+json')
@@ -263,10 +289,31 @@ export class OpenAIChatCompletionProvider implements ApiProvider {
 
   private convertMessages(
     messages: readonly vscode.LanguageModelChatRequestMessage[],
+    emitReasoningContent: boolean,
   ): ChatCompletionMessageParam[] {
     const result: ChatCompletionMessageParam[] = [];
 
-    for (const msg of messages) {
+    const isToolResultUserMessage = (
+      msg: vscode.LanguageModelChatRequestMessage,
+    ): boolean =>
+      msg.role === vscode.LanguageModelChatMessageRole.User &&
+      msg.content.some((p) => p instanceof vscode.LanguageModelToolResultPart);
+
+    const lastRealUserIndex = (() => {
+      for (let i = messages.length - 1; i >= 0; i--) {
+        const msg = messages[i];
+        if (
+          msg.role === vscode.LanguageModelChatMessageRole.User &&
+          !isToolResultUserMessage(msg)
+        ) {
+          return i;
+        }
+      }
+      return -1;
+    })();
+
+    for (let i = 0; i < messages.length; i++) {
+      const msg = messages[i];
       if (msg.role === vscode.LanguageModelChatMessageRole.System) {
         const content = this.convertTextContentParts(msg.content);
         if (content.length > 0) {
@@ -283,11 +330,19 @@ export class OpenAIChatCompletionProvider implements ApiProvider {
           result.push(...toolResults);
         }
       } else if (msg.role === vscode.LanguageModelChatMessageRole.Assistant) {
-        const { content, toolCalls } = this.convertAssistantParts(msg.content);
+        const nextMessage = messages[i + 1];
+        const shouldKeepReasoningContent =
+          emitReasoningContent &&
+          i > lastRealUserIndex &&
+          !!nextMessage &&
+          isToolResultUserMessage(nextMessage);
+        const { content, toolCalls, reasoningContent } =
+          this.convertAssistantParts(msg.content, shouldKeepReasoningContent);
         result.push({
           role: 'assistant',
           content: content.length > 0 ? content : null,
           tool_calls: toolCalls.length > 0 ? toolCalls : undefined,
+          ...(reasoningContent ? { reasoning_content: reasoningContent } : {}),
         });
       } else {
         throw new Error(
@@ -396,14 +451,11 @@ export class OpenAIChatCompletionProvider implements ApiProvider {
     performanceTrace: PerformanceTrace,
     token: vscode.CancellationToken,
     requestId: string,
+    usage: { value?: CompletionUsage },
+    emitReasoningContent: boolean,
   ): AsyncGenerator<vscode.LanguageModelResponsePart2> {
     const toolStates = new Map<number, ToolCallState>();
     const firstTokenRecorded = { value: false };
-    let usage:
-      | {
-          completion_tokens?: number | null;
-        }
-      | undefined;
 
     for await (const chunk of stream) {
       if (token.isCancellationRequested) {
@@ -411,14 +463,21 @@ export class OpenAIChatCompletionProvider implements ApiProvider {
       }
 
       logResponseChunk(requestId, JSON.stringify(chunk));
-      if ((chunk as { usage?: unknown }).usage) {
-        usage = (chunk as { usage: { completion_tokens?: number | null } })
-          .usage;
+      if (chunk.usage) {
+        usage.value = chunk.usage;
       }
 
       const choice = chunk.choices[0];
       if (!choice) {
         continue;
+      }
+
+      if (emitReasoningContent) {
+        const reasoningDelta = (choice.delta as any).reasoning_content;
+        if (typeof reasoningDelta === 'string' && reasoningDelta) {
+          this.recordFirstToken(performanceTrace, firstTokenRecorded);
+          yield new vscode.LanguageModelThinkingPart(reasoningDelta);
+        }
       }
 
       const deltaContent = choice.delta.content;
@@ -440,54 +499,21 @@ export class OpenAIChatCompletionProvider implements ApiProvider {
           }
           toolStates.set(call.index, existing);
         }
-        const emitted = this.parseAndEmitToolCalls(
-          toolStates,
-          requestId,
-          performanceTrace,
-          firstTokenRecorded,
-        );
-        for (const part of emitted) {
-          yield part;
+      }
+
+      if (choice.finish_reason) {
+        if (toolStates.size > 0) {
+          const emitted = this.parseAndEmitToolCalls(
+            toolStates,
+            requestId,
+            performanceTrace,
+            firstTokenRecorded,
+          );
+          for (const part of emitted) {
+            yield part;
+          }
         }
       }
-
-      if (choice.finish_reason === 'tool_calls') {
-        const emitted = this.parseAndEmitToolCalls(
-          toolStates,
-          requestId,
-          performanceTrace,
-          firstTokenRecorded,
-        );
-        for (const part of emitted) {
-          yield part;
-        }
-      } else if (choice.finish_reason === 'stop') {
-        break;
-      }
-    }
-
-    if (toolStates.size > 0) {
-      const emitted = this.parseAndEmitToolCalls(
-        toolStates,
-        requestId,
-        performanceTrace,
-        firstTokenRecorded,
-      );
-      for (const part of emitted) {
-        yield part;
-      }
-    }
-
-    if (
-      usage?.completion_tokens !== undefined &&
-      usage.completion_tokens !== null
-    ) {
-      performanceTrace.tps =
-        (usage.completion_tokens /
-          (Date.now() - (performanceTrace.tts + performanceTrace.ttf))) *
-        1000;
-    } else {
-      performanceTrace.tps = NaN;
     }
   }
 
@@ -495,18 +521,33 @@ export class OpenAIChatCompletionProvider implements ApiProvider {
     response: ChatCompletion,
     performanceTrace: PerformanceTrace,
     requestId: string,
+    usage: { value?: CompletionUsage },
+    emitReasoningContent: boolean,
   ): AsyncGenerator<vscode.LanguageModelResponsePart2> {
     logResponseChunk(requestId, JSON.stringify(response));
+
+    if (response.usage) {
+      usage.value = response.usage;
+    }
 
     const choice = response.choices[0];
     if (!choice) {
       throw new Error('OpenAI response did not include any choices');
     }
 
+    const firstTokenRecorded = { value: false };
+
+    if (emitReasoningContent) {
+      const reasoningContent = (choice.message as any).reasoning_content;
+      if (typeof reasoningContent === 'string' && reasoningContent) {
+        this.recordFirstToken(performanceTrace, firstTokenRecorded);
+        yield new vscode.LanguageModelThinkingPart(reasoningContent);
+      }
+    }
+
     const messageContent = choice.message.content;
     if (typeof messageContent === 'string' && messageContent) {
-      performanceTrace.ttft =
-        Date.now() - (performanceTrace.tts + performanceTrace.ttf);
+      this.recordFirstToken(performanceTrace, firstTokenRecorded);
       yield new vscode.LanguageModelTextPart(messageContent);
     }
 
@@ -523,33 +564,13 @@ export class OpenAIChatCompletionProvider implements ApiProvider {
         } catch {
           parsed = {};
         }
-        performanceTrace.ttft =
-          performanceTrace.ttft ||
-          Date.now() - (performanceTrace.tts + performanceTrace.ttf);
+        this.recordFirstToken(performanceTrace, firstTokenRecorded);
         yield new vscode.LanguageModelToolCallPart(
           call.id,
           call.function.name,
           parsed,
         );
       }
-    }
-
-    const usage = (
-      response as { usage?: { completion_tokens?: number | null } }
-    ).usage;
-    if (
-      usage?.completion_tokens !== undefined &&
-      usage.completion_tokens !== null
-    ) {
-      performanceTrace.ttft =
-        performanceTrace.ttft ||
-        Date.now() - (performanceTrace.tts + performanceTrace.ttf);
-      performanceTrace.tps =
-        (usage.completion_tokens /
-          (Date.now() - (performanceTrace.tts + performanceTrace.ttf))) *
-        1000;
-    } else {
-      performanceTrace.tps = NaN;
     }
   }
 
@@ -565,7 +586,14 @@ export class OpenAIChatCompletionProvider implements ApiProvider {
       abortController.abort();
     });
 
-    const convertedMessages = this.convertMessages(messages);
+    const emitReasoningContent = isFeatureSupported(
+      FeatureId.OpenAIReasoningContent,
+      model,
+    );
+    const convertedMessages = this.convertMessages(
+      messages,
+      emitReasoningContent,
+    );
     const tools = this.convertTools(options.tools);
     const toolChoice = this.convertToolChoice(options.toolMode, tools);
     const streamEnabled = model.stream ?? true;
@@ -573,6 +601,9 @@ export class OpenAIChatCompletionProvider implements ApiProvider {
     const baseBody: ChatCompletionCreateParamsBase = {
       model: model.id,
       messages: convertedMessages,
+      ...(model.thinking?.effort !== undefined
+        ? { reasoning_effort: model.thinking.effort as any }
+        : {}),
       ...(model.maxOutputTokens !== undefined
         ? isFeatureSupported(FeatureId.OpenAIOnlyUseMaxCompletionTokens, model)
           ? { max_completion_tokens: model.maxOutputTokens }
@@ -618,28 +649,51 @@ export class OpenAIChatCompletionProvider implements ApiProvider {
       body: requestPayload,
     });
 
+    const usage: { value?: CompletionUsage } = {};
+
     try {
       if (streamEnabled) {
+        performanceTrace.ttf = Date.now() - performanceTrace.tts;
         const streamResponse = await this.client.chat.completions.create(
           streamingPayload,
           {
             signal: abortController.signal,
           },
         );
-        performanceTrace.ttf = Date.now() - performanceTrace.tts;
         yield* this.handleStream(
           streamResponse as AsyncIterable<ChatCompletionChunk>,
           performanceTrace,
           token,
           requestId,
+          usage,
+          emitReasoningContent,
         );
       } else {
+        performanceTrace.ttf = Date.now() - performanceTrace.tts;
         const response = await this.client.chat.completions.create(
           nonStreamingPayload,
           { signal: abortController.signal },
         );
-        performanceTrace.ttf = Date.now() - performanceTrace.tts;
-        yield* this.handleNonStream(response, performanceTrace, requestId);
+        yield* this.handleNonStream(
+          response,
+          performanceTrace,
+          requestId,
+          usage,
+          emitReasoningContent,
+        );
+      }
+
+      if (usage.value?.completion_tokens) {
+        performanceTrace.tps =
+          (usage.value.completion_tokens /
+            (Date.now() - (performanceTrace.tts + performanceTrace.ttf))) *
+          1000;
+      } else {
+        performanceTrace.tps = NaN;
+      }
+
+      if (usage.value) {
+        logInfo(`[${requestId}] Usage: ${JSON.stringify(usage.value)}`);
       }
 
       logResponseComplete(requestId);

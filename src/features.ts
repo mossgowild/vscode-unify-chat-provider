@@ -18,9 +18,13 @@ export enum FeatureId {
    */
   AnthropicCitations = 'anthropic_citations',
   /**
-   * https://community.openai.com/t/developer-role-not-accepted-for-o1-o1-mini-o3-mini/1110750/7
+   * @see https://community.openai.com/t/developer-role-not-accepted-for-o1-o1-mini-o3-mini/1110750/7
    */
   OpenAIOnlyUseMaxCompletionTokens = 'openai_only-use-max-completion-tokens',
+  /**
+   * @see https://api-docs.deepseek.com/zh-cn/guides/thinking_mode
+   */
+  OpenAIReasoningContent = 'openai_reasoning-content',
 }
 
 export interface Feature {
@@ -102,6 +106,9 @@ export const FEATURES: Record<FeatureId, Feature> = {
       'gpt-oss-120b',
       'gpt-oss-20b',
     ],
+  },
+  [FeatureId.OpenAIReasoningContent]: {
+    supportedModels: ['deepseek-reasoner'],
   },
 };
 
