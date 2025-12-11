@@ -8,6 +8,7 @@ import {
 import { ApiProvider, ProviderConfig, ModelConfig } from './client/interface';
 import { createRequestLogger } from './logger';
 import { PerformanceTrace } from './types';
+import { getBaseModelId } from './model-id-utils';
 
 export class UnifyChatService implements vscode.LanguageModelChatProvider {
   private readonly clients = new Map<string, ApiProvider>();
@@ -54,7 +55,7 @@ export class UnifyChatService implements vscode.LanguageModelChatProvider {
     return {
       id: modelId,
       name: model.name ?? model.id,
-      family: model.family ?? model.id,
+      family: model.family ?? getBaseModelId(model.id),
       version: '1.0.0',
       maxInputTokens: model.maxInputTokens ?? DEFAULT_MAX_INPUT_TOKENS,
       maxOutputTokens: model.maxOutputTokens ?? DEFAULT_MAX_OUTPUT_TOKENS,

@@ -22,6 +22,7 @@ import {
 import type { RequestLogger } from '../../logger';
 import { ApiProvider, ProviderConfig, ModelConfig } from '../interface';
 import { normalizeBaseUrlInput, fetchWithRetry } from '../../utils';
+import { getBaseModelId } from '../../model-id-utils';
 import { DEFAULT_MAX_OUTPUT_TOKENS } from '../../defaults';
 import {
   CustomDataPartMimeTypes,
@@ -708,7 +709,7 @@ export class AnthropicProvider implements ApiProvider {
 
     try {
       const requestBody: AnthropicRequest = {
-        model: model.id,
+        model: getBaseModelId(model.id),
         messages: anthropicMessages,
         max_tokens: model.maxOutputTokens ?? DEFAULT_MAX_OUTPUT_TOKENS,
         stream: true,

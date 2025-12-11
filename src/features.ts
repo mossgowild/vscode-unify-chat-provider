@@ -1,4 +1,5 @@
 import { ModelConfig } from './client/interface';
+import { getBaseModelId } from './model-id-utils';
 
 export enum FeatureId {
   /**
@@ -118,13 +119,13 @@ export function isFeatureSupported(
     return false;
   }
 
-  // Check if model ID is explicitly supported
-  if (model.id && feature.supportedModels?.includes(model.id)) {
+  const baseId = getBaseModelId(model.id);
+  if (baseId && feature.supportedModels?.includes(baseId)) {
     return true;
   }
 
-  // Check if model family is supported
-  if (model.id && feature.supportedFamilys?.includes(model.id)) {
+  const family = model.family ?? baseId;
+  if (family && feature.supportedFamilys?.includes(family)) {
     return true;
   }
 

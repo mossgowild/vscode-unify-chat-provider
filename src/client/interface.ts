@@ -30,7 +30,7 @@ export interface ProviderConfig {
  * Configuration for a single model
  */
 export interface ModelConfig {
-  /** Model ID (e.g., claude-sonnet-4-20250514) */
+  /** Model ID (e.g., claude-sonnet-4-20250514#thinking) */
   id: string;
   /** Display name for the model */
   name?: string;

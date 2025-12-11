@@ -2,7 +2,12 @@ import * as vscode from 'vscode';
 import { createProvider } from '../client';
 import type { ModelConfig } from '../client/interface';
 import { WELL_KNOWN_MODELS } from '../well-known-models';
-import { confirmDelete, pickQuickItem, showValidationErrors } from './component';
+import { generateAutoVersionedId } from '../model-id-utils';
+import {
+  confirmDelete,
+  pickQuickItem,
+  showValidationErrors,
+} from './component';
 import { editField } from './field-editors';
 import { buildFormItems, type FormItem } from './field-schema';
 import {
@@ -178,15 +183,6 @@ async function runModelForm(
       placeholder: 'Select a field to edit',
       ignoreFocusOut: true,
       items: buildFormItems(modelFormSchema, draft, { isEditing: !!model }),
-      onWillAccept: async (item) => {
-        if (item.action !== 'confirm') return true;
-        const err = validateModelIdUnique(draft.id, models, originalId);
-        if (err) {
-          await showValidationErrors([err]);
-          return false;
-        }
-        return true;
-      },
     });
 
     if (!selection || selection.action === 'cancel') {
@@ -335,12 +331,23 @@ async function showModelSelectionPicker(
 
         for (const model of models) {
           const alreadyExists = existingIds.has(model.id);
+          let detail: string | undefined;
+
+          if (alreadyExists) {
+            // Calculate what ID would be used if selected
+            const newId = generateAutoVersionedId(
+              model.id,
+              options.existingModels,
+            );
+            detail = `(already exists, will add as ${newId})`;
+          } else {
+            detail = formatModelDetail(model);
+          }
+
           items.push({
             label: model.name || model.id,
             description: model.name ? model.id : undefined,
-            detail: alreadyExists
-              ? '(already added)'
-              : formatModelDetail(model),
+            detail,
             model,
             picked: false,
           });
@@ -387,27 +394,29 @@ async function showModelSelectionPicker(
         return;
       }
 
-      // Filter out already existing models and collect selected models
+      // Collect selected models, auto-generating version IDs for duplicates
       const existingIds = new Set(options.existingModels.map((m) => m.id));
       const newModels: ModelConfig[] = [];
-      const conflictIds: string[] = [];
+      // Track models added in this batch to generate sequential versions
+      const addedInBatch: ModelConfig[] = [];
 
       for (const item of selectedItems) {
         if (item.model) {
-          if (existingIds.has(item.model.id)) {
-            conflictIds.push(item.model.id);
-          } else {
-            newModels.push({ ...item.model });
-          }
-        }
-      }
+          const combinedModels = [...options.existingModels, ...addedInBatch];
+          let newId = item.model.id;
 
-      if (conflictIds.length > 0) {
-        vscode.window.showWarningMessage(
-          `The following models are already added and will be skipped: ${conflictIds.join(
-            ', ',
-          )}`,
-        );
+          // If this ID already exists, generate a versioned ID
+          if (
+            existingIds.has(item.model.id) ||
+            addedInBatch.some((m) => m.id === item.model!.id)
+          ) {
+            newId = generateAutoVersionedId(item.model.id, combinedModels);
+          }
+
+          const newModel = { ...item.model, id: newId };
+          newModels.push(newModel);
+          addedInBatch.push(newModel);
+        }
       }
 
       if (newModels.length > 0) {

@@ -11,6 +11,7 @@ import {
   validateModelIdUnique,
   validatePositiveIntegerOrEmpty,
 } from './form-utils';
+import { hasVersion, generateAutoVersionedId } from '../model-id-utils';
 
 /**
  * Context for model form fields.
@@ -31,19 +32,65 @@ export const modelFormSchema: FormSchema<ModelConfig> = {
     { id: 'parameters', label: 'Parameters' },
   ],
   fields: [
-    // ID field
+    // ID field (custom to handle auto-versioning dialog on edit)
     {
       key: 'id',
-      type: 'text',
+      type: 'custom',
       label: 'Model ID',
       icon: 'tag',
       section: 'primary',
-      prompt: 'Enter the model ID',
-      placeholder: 'e.g., claude-sonnet-4-20250514',
-      required: true,
-      validate: (value, _draft, context) => {
+      edit: async (draft, context) => {
         const ctx = context as ModelFieldContext;
-        return validateModelIdUnique(value, ctx.models, ctx.originalId);
+
+        const value = await showInput({
+          prompt: 'Enter the model ID',
+          placeHolder: 'e.g., claude-sonnet-4-20250514',
+          value: draft.id,
+          validateInput: (input) => {
+            const trimmed = input.trim();
+            if (!trimmed) return 'Model ID is required';
+            if (ctx.originalId && trimmed === ctx.originalId) return null;
+            // Only show error for duplicate versioned IDs
+            if (
+              validateModelIdUnique(trimmed, ctx.models, ctx.originalId) &&
+              hasVersion(trimmed)
+            ) {
+              return 'A model with this ID already exists';
+            }
+            return null;
+          },
+        });
+
+        if (value === undefined) return; // User cancelled
+
+        const trimmedId = value.trim();
+        if (!trimmedId) return;
+
+        // Check if this exact ID already exists (and it's not the original)
+        if (validateModelIdUnique(trimmedId, ctx.models, ctx.originalId)) {
+          // If ID already has a version, the input validation already blocked it
+          // This handles the case where ID has no version - show auto-version dialog
+          if (!hasVersion(trimmedId)) {
+            const autoVersionedId = generateAutoVersionedId(
+              trimmedId,
+              ctx.models,
+            );
+            const choice = await vscode.window.showWarningMessage(
+              `A model with ID '${trimmedId}' already exists.\nAdd version suffix? '${trimmedId}' → '${autoVersionedId}'`,
+              { modal: true },
+              'Yes',
+              'No',
+            );
+
+            if (choice === 'Yes') {
+              draft.id = autoVersionedId;
+            }
+            // If No or cancelled, don't update draft.id (keep original)
+            return;
+          }
+        }
+
+        draft.id = trimmedId;
       },
       getDescription: (draft) => draft.id || '(required)',
     },

@@ -23,6 +23,7 @@ import {
 import { ApiProvider, ModelConfig, ProviderConfig } from '../interface';
 import { FeatureId, isFeatureSupported } from '../../features';
 import { WELL_KNOWN_MODELS } from '../../well-known-models';
+import { getBaseModelId } from '../../model-id-utils';
 
 type OpenAIContentPart =
   | ChatCompletionContentPartText
@@ -618,7 +619,7 @@ export class OpenAIChatCompletionProvider implements ApiProvider {
     const streamEnabled = model.stream ?? true;
 
     const baseBody: ChatCompletionCreateParamsBase = {
-      model: model.id,
+      model: getBaseModelId(model.id),
       messages: convertedMessages,
       ...(model.thinking?.effort !== undefined
         ? { reasoning_effort: model.thinking.effort as any }

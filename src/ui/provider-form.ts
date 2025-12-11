@@ -177,15 +177,6 @@ export async function openProviderForm(
       items: buildFormItems(providerFormSchema, draft, {
         isEditing: !!existing,
       }),
-      onWillAccept: async (item) => {
-        if (item.action !== 'confirm') return true;
-        const errors = validateProviderForm(draft, store, originalName);
-        if (errors.length > 0) {
-          await showValidationErrors(errors);
-          return false;
-        }
-        return true;
-      },
     });
 
     if (!selection || selection.action === 'cancel') {

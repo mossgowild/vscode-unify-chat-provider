@@ -97,9 +97,9 @@ export async function showInput(options: {
 
 export async function showValidationErrors(errors: string[]): Promise<void> {
   if (errors.length === 0) return;
-  await vscode.window.showErrorMessage(
-    `Please fix the following:\n${errors.join('\n')}`,
-  );
+  await vscode.window.showErrorMessage(`Please fix:\n${errors.join('\n')}`, {
+    modal: true,
+  });
 }
 
 /**
