@@ -1,43 +1,44 @@
+import {
+  LanguageModelChatRequestMessage,
+  ProvideLanguageModelChatResponseOptions,
+  CancellationToken,
+} from 'vscode';
+import { RequestLogger } from '../../logger';
+import { PerformanceTrace } from '../../types';
+import { ApiProvider, ModelConfig, ProviderConfig } from '../interface';
 import OpenAI from 'openai';
-import type {
+import {
+  decodeStatefulMarkerPart,
+  DEFAULT_RETRY_CONFIG,
+  encodeStatefulMarkerPart,
+  fetchWithRetry,
+  isCacheControlMarker,
+  isImageMarker,
+  isInternalMarker,
+  normalizeBaseUrlInput,
+  normalizeImageMimeType,
+} from '../../utils';
+import { WELL_KNOWN_MODELS } from '../../well-known-models';
+import * as vscode from 'vscode';
+import {
   ChatCompletion,
+  ChatCompletionAssistantMessageParam,
   ChatCompletionChunk,
-  ChatCompletionCreateParamsStreaming,
-  ChatCompletionContentPartImage,
+  ChatCompletionContentPart,
   ChatCompletionContentPartText,
+  ChatCompletionCreateParamsBase,
   ChatCompletionFunctionTool,
+  ChatCompletionMessage,
   ChatCompletionMessageParam,
   ChatCompletionMessageToolCall,
   ChatCompletionToolChoiceOption,
-  ChatCompletionCreateParamsBase,
 } from 'openai/resources/chat/completions';
-import * as vscode from 'vscode';
-import type { RequestLogger } from '../../logger';
-import type { CompletionUsage } from 'openai/resources/completions';
-import { PerformanceTrace, CustomDataPartMimeTypes } from '../../types';
-import {
-  normalizeBaseUrlInput,
-  fetchWithRetry,
-  DEFAULT_RETRY_CONFIG,
-} from '../../utils';
-import { ApiProvider, ModelConfig, ProviderConfig } from '../interface';
-import { FeatureId, isFeatureSupported } from '../../features';
-import { WELL_KNOWN_MODELS } from '../../well-known-models';
+import { FunctionParameters } from 'openai/resources/shared';
 import { getBaseModelId } from '../../model-id-utils';
-
-type OpenAIContentPart =
-  | ChatCompletionContentPartText
-  | ChatCompletionContentPartImage;
-type OpenAITextContentPart = ChatCompletionContentPartText;
-
-type ToolCallState = {
-  id?: string;
-  name?: string;
-  args: string;
-};
-
-type MessageContent = vscode.LanguageModelChatRequestMessage['content'][number];
-type ToolResultContent = vscode.LanguageModelToolResultPart['content'][number];
+import { FeatureId, isFeatureSupported } from '../../features';
+import { CompletionUsage } from 'openai/resources/completions';
+import { Stream } from 'openai/core/streaming';
+import { ChatCompletionSnapshot } from 'openai/lib/ChatCompletionStream';
 
 export class OpenAIChatCompletionProvider implements ApiProvider {
   private readonly baseUrl: string;
@@ -46,6 +47,22 @@ export class OpenAIChatCompletionProvider implements ApiProvider {
   constructor(private readonly config: ProviderConfig) {
     this.baseUrl = this.buildBaseUrl(config.baseUrl);
     this.endpoint = `${this.baseUrl}/chat/completions`;
+  }
+
+  private buildBaseUrl(baseUrl: string): string {
+    const normalized = normalizeBaseUrlInput(baseUrl);
+    return /\/v\d+$/.test(normalized) ? normalized : `${normalized}/v1`;
+  }
+
+  private buildHeaders(): Record<string, string> {
+    const headers: Record<string, string> = {
+      'Accept': 'application/json',
+      'Content-Type': 'application/json',
+    };
+    if (this.config.apiKey) {
+      headers['Authorization'] = `Bearer ${this.config.apiKey}`;
+    }
+    return headers;
   }
 
   /**
@@ -73,307 +90,249 @@ export class OpenAIChatCompletionProvider implements ApiProvider {
     });
   }
 
-  private buildBaseUrl(baseUrl: string): string {
-    const normalized = normalizeBaseUrlInput(baseUrl);
-    return /\/v\d+$/.test(normalized) ? normalized : `${normalized}/v1`;
-  }
-
-  private buildHeaders(): Record<string, string> {
-    const headers: Record<string, string> = {
-      'Accept': 'application/json',
-      'Content-Type': 'application/json',
-    };
-    if (this.config.apiKey) {
-      headers['Authorization'] = `Bearer ${this.config.apiKey}`;
-    }
-    return headers;
-  }
-
-  private stringifyArguments(input: unknown): string {
-    try {
-      return JSON.stringify(input ?? {});
-    } catch {
-      return '{}';
-    }
-  }
-
-  private convertContentParts(
-    parts: readonly MessageContent[],
-  ): OpenAIContentPart[] {
-    const content: OpenAIContentPart[] = [];
-
-    for (const part of parts) {
-      if (part instanceof vscode.LanguageModelTextPart) {
-        if (part.value.trim()) {
-          content.push({ type: 'text', text: part.value });
-        }
-      } else if (part instanceof vscode.LanguageModelDataPart) {
-        if (
-          part.mimeType === CustomDataPartMimeTypes.CacheControl ||
-          part.mimeType === CustomDataPartMimeTypes.StatefulMarker ||
-          part.mimeType === CustomDataPartMimeTypes.ThinkingData
-        ) {
-          continue;
-        }
-        if (part.mimeType.startsWith('image/')) {
-          const dataString = Buffer.from(part.data).toString('utf-8');
-          const isUrl =
-            dataString.startsWith('http://') ||
-            dataString.startsWith('https://') ||
-            dataString.startsWith('data:');
-          const url = isUrl
-            ? dataString
-            : `data:${part.mimeType};base64,${Buffer.from(part.data).toString(
-                'base64',
-              )}`;
-          content.push({ type: 'image_url', image_url: { url } });
-        } else if (
-          part.mimeType.startsWith('text/') ||
-          part.mimeType === 'application/json' ||
-          part.mimeType.endsWith('+json')
-        ) {
-          const text = Buffer.from(part.data).toString('utf-8');
-          if (text.trim()) {
-            content.push({ type: 'text', text });
-          }
-        } else {
-          throw new Error(
-            `Unsupported data part mime type for OpenAI provider: ${part.mimeType}`,
-          );
-        }
-      } else if (
-        part instanceof vscode.LanguageModelThinkingPart ||
-        part instanceof vscode.LanguageModelToolCallPart ||
-        part instanceof vscode.LanguageModelToolResultPart
-      ) {
-        continue;
-      } else {
-        throw new Error('Unsupported message part type for OpenAI provider.');
-      }
-    }
-
-    return content;
-  }
-
-  private convertTextContentParts(
-    parts: readonly MessageContent[],
-  ): OpenAITextContentPart[] {
-    const content: OpenAITextContentPart[] = [];
-
-    for (const part of parts) {
-      if (part instanceof vscode.LanguageModelTextPart) {
-        if (part.value.trim()) {
-          content.push({ type: 'text', text: part.value });
-        }
-      } else if (part instanceof vscode.LanguageModelDataPart) {
-        if (
-          part.mimeType === CustomDataPartMimeTypes.CacheControl ||
-          part.mimeType === CustomDataPartMimeTypes.StatefulMarker ||
-          part.mimeType === CustomDataPartMimeTypes.ThinkingData
-        ) {
-          continue;
-        }
-        if (
-          part.mimeType.startsWith('text/') ||
-          part.mimeType === 'application/json' ||
-          part.mimeType.endsWith('+json')
-        ) {
-          const text = Buffer.from(part.data).toString('utf-8');
-          if (text.trim()) {
-            content.push({ type: 'text', text });
-          }
-        } else {
-          throw new Error(
-            `Unsupported data part mime type for text-only conversion in OpenAI provider: ${part.mimeType}`,
-          );
-        }
-      } else if (
-        part instanceof vscode.LanguageModelThinkingPart ||
-        part instanceof vscode.LanguageModelToolCallPart ||
-        part instanceof vscode.LanguageModelToolResultPart
-      ) {
-        continue;
-      } else {
-        throw new Error('Unsupported message part type for OpenAI provider.');
-      }
-    }
-
-    return content;
-  }
-
-  private convertAssistantParts(
-    parts: readonly MessageContent[],
-    includeReasoningContent: boolean,
-  ): {
-    content: OpenAITextContentPart[];
-    toolCalls: ChatCompletionMessageToolCall[];
-    reasoningContent?: string;
-  } {
-    const content: OpenAITextContentPart[] = [];
-    const toolCalls: ChatCompletionMessageToolCall[] = [];
-    const reasoningParts: string[] = [];
-
-    for (const part of parts) {
-      if (part instanceof vscode.LanguageModelToolCallPart) {
-        toolCalls.push({
-          id: part.callId,
-          type: 'function',
-          function: {
-            name: part.name,
-            arguments: this.stringifyArguments(part.input),
-          },
-        });
-      } else if (part instanceof vscode.LanguageModelThinkingPart) {
-        if (includeReasoningContent) {
-          reasoningParts.push(
-            ...(Array.isArray(part.value) ? part.value : [part.value]),
-          );
-        }
-        continue;
-      } else if (part instanceof vscode.LanguageModelToolResultPart) {
-        continue;
-      } else {
-        content.push(...this.convertTextContentParts([part]));
-      }
-    }
-
-    return {
-      content,
-      toolCalls,
-      reasoningContent:
-        reasoningParts.length > 0 ? reasoningParts.join('\n') : undefined,
-    };
-  }
-
-  private convertUserMessageParts(parts: readonly MessageContent[]): {
-    content: OpenAIContentPart[];
-    toolResults: ChatCompletionMessageParam[];
-  } {
-    const content: OpenAIContentPart[] = [];
-    const toolResults: ChatCompletionMessageParam[] = [];
-
-    for (const part of parts) {
-      if (part instanceof vscode.LanguageModelToolResultPart) {
-        const text = this.extractToolResultText(part.content);
-        toolResults.push({
-          role: 'tool',
-          tool_call_id: part.callId,
-          content: text,
-        });
-      } else if (part instanceof vscode.LanguageModelThinkingPart) {
-        continue;
-      } else if (part instanceof vscode.LanguageModelToolCallPart) {
-        continue;
-      } else {
-        content.push(...this.convertContentParts([part]));
-      }
-    }
-
-    return { content, toolResults };
-  }
-
-  private extractToolResultText(content: readonly ToolResultContent[]): string {
-    const chunks: string[] = [];
-    for (const part of content) {
-      if (part instanceof vscode.LanguageModelTextPart) {
-        chunks.push(part.value);
-      } else if (part instanceof vscode.LanguageModelDataPart) {
-        if (
-          part.mimeType === CustomDataPartMimeTypes.CacheControl ||
-          part.mimeType === CustomDataPartMimeTypes.StatefulMarker ||
-          part.mimeType === CustomDataPartMimeTypes.ThinkingData
-        ) {
-          continue;
-        }
-        if (
-          part.mimeType.startsWith('text/') ||
-          part.mimeType === 'application/json' ||
-          part.mimeType.endsWith('+json')
-        ) {
-          chunks.push(Buffer.from(part.data).toString('utf-8'));
-        } else {
-          throw new Error(
-            `Unsupported tool result data part mime type for OpenAI provider: ${part.mimeType}`,
-          );
-        }
-      } else {
-        throw new Error(
-          'Unsupported tool result part type for OpenAI provider.',
-        );
-      }
-    }
-    return chunks.join('\n');
-  }
-
   private convertMessages(
+    encodedModelId: string,
     messages: readonly vscode.LanguageModelChatRequestMessage[],
-    emitReasoningContent: boolean,
-    keepAllReasoningContent: boolean,
   ): ChatCompletionMessageParam[] {
-    const result: ChatCompletionMessageParam[] = [];
+    const outMessages: ChatCompletionMessageParam[] = [];
+    const rawMap = new Map<
+      ChatCompletionAssistantMessageParam,
+      ChatCompletionMessage
+    >();
 
-    const isToolResultUserMessage = (
-      msg: vscode.LanguageModelChatRequestMessage,
-    ): boolean =>
-      msg.role === vscode.LanguageModelChatMessageRole.User &&
-      msg.content.some((p) => p instanceof vscode.LanguageModelToolResultPart);
+    for (const msg of messages) {
+      switch (msg.role) {
+        case vscode.LanguageModelChatMessageRole.System:
+          for (const part of msg.content) {
+            const parts = this.convertPart(msg.role, part)?.parts as
+              | ChatCompletionContentPartText[]
+              | undefined;
+            if (parts) outMessages.push({ role: 'system', content: parts });
+          }
+          break;
 
-    const lastRealUserIndex = (() => {
-      for (let i = messages.length - 1; i >= 0; i--) {
-        const msg = messages[i];
-        if (
-          msg.role === vscode.LanguageModelChatMessageRole.User &&
-          !isToolResultUserMessage(msg)
-        ) {
-          return i;
-        }
-      }
-      return -1;
-    })();
+        case vscode.LanguageModelChatMessageRole.User:
+          for (const part of msg.content) {
+            const result = this.convertPart(msg.role, part);
+            if (result) {
+              if (result.isToolResult) {
+                outMessages.push({
+                  role: 'tool',
+                  content: result.parts as ChatCompletionContentPartText[],
+                  tool_call_id: result.toolResultId!,
+                });
+              } else {
+                outMessages.push({
+                  role: 'user',
+                  content: result.parts as ChatCompletionContentPart[],
+                });
+              }
+            }
+          }
+          break;
 
-    for (let i = 0; i < messages.length; i++) {
-      const msg = messages[i];
-      if (msg.role === vscode.LanguageModelChatMessageRole.System) {
-        const content = this.convertTextContentParts(msg.content);
-        if (content.length > 0) {
-          result.push({ role: 'system', content });
-        }
-      } else if (msg.role === vscode.LanguageModelChatMessageRole.User) {
-        const { content, toolResults } = this.convertUserMessageParts(
-          msg.content,
-        );
-        if (content.length > 0) {
-          result.push({ role: 'user', content });
-        }
-        if (toolResults.length > 0) {
-          result.push(...toolResults);
-        }
-      } else if (msg.role === vscode.LanguageModelChatMessageRole.Assistant) {
-        const nextMessage = messages[i + 1];
-        const shouldKeepReasoningContent =
-          emitReasoningContent &&
-          i > lastRealUserIndex &&
-          !!nextMessage &&
-          isToolResultUserMessage(nextMessage);
-        const { content, toolCalls, reasoningContent } =
-          this.convertAssistantParts(
-            msg.content,
-            shouldKeepReasoningContent || keepAllReasoningContent,
+        case vscode.LanguageModelChatMessageRole.Assistant:
+          const rawPart = msg.content.find(
+            (v) => v instanceof vscode.LanguageModelDataPart,
+          ) as vscode.LanguageModelDataPart | undefined;
+          if (rawPart) {
+            try {
+              const raw = rawPart
+                ? decodeStatefulMarkerPart<ChatCompletionMessage>(
+                    encodedModelId,
+                    rawPart,
+                  )
+                : undefined;
+              if (raw) {
+                const message: ChatCompletionAssistantMessageParam = {
+                  role: 'assistant',
+                  content: undefined,
+                  tool_calls: undefined,
+                };
+                rawMap.set(message, raw);
+                outMessages.push(message);
+              }
+            } catch (error) {}
+          } else {
+            for (const part of msg.content) {
+              const result = this.convertPart(msg.role, part);
+              if (result)
+                outMessages.push(
+                  result.isToolCall
+                    ? {
+                        role: 'assistant',
+                        tool_calls:
+                          result.parts as ChatCompletionMessageToolCall[],
+                      }
+                    : {
+                        role: 'assistant',
+                        content:
+                          result.parts as ChatCompletionContentPartText[],
+                      },
+                );
+            }
+          }
+          break;
+
+        default:
+          throw new Error(
+            `Unsupported message role for Anthropic provider: ${msg.role}`,
           );
-        result.push({
-          role: 'assistant',
-          content: content.length > 0 ? content : null,
-          tool_calls: toolCalls.length > 0 ? toolCalls : undefined,
-          ...(reasoningContent ? { reasoning_content: reasoningContent } : {}),
-        });
-      } else {
-        throw new Error(
-          `Unsupported chat message role for OpenAI provider: ${msg.role}`,
-        );
       }
     }
 
-    return result;
+    // use raw messages, for details, see parseMessage's NOTE comments.
+    for (const [param, raw] of rawMap) {
+      const index = outMessages.indexOf(param);
+      outMessages[index] = raw;
+    }
+
+    return outMessages;
+  }
+
+  convertPart(
+    role: vscode.LanguageModelChatMessageRole | 'tool_result',
+    part: vscode.LanguageModelInputPart | unknown,
+  ):
+    | {
+        parts:
+          | (ChatCompletionContentPart | ChatCompletionMessageToolCall)[]
+          | string;
+        isToolCall?: boolean;
+        isToolResult?: boolean;
+        toolResultId?: string;
+      }
+    | undefined {
+    if (part == null) {
+      return undefined;
+    }
+
+    if (part instanceof vscode.LanguageModelTextPart) {
+      if (part.value.trim()) {
+        return { parts: [{ type: 'text', text: part.value }] };
+      } else {
+        return undefined;
+      }
+    } else if (part instanceof vscode.LanguageModelThinkingPart) {
+      if (role !== vscode.LanguageModelChatMessageRole.Assistant) {
+        throw new Error('Thinking parts can only appear in assistant messages');
+      }
+      // The official version of the API does not support processing or considering any content.
+      //   const metadata = part.metadata as ThinkingBlockMetadata | undefined;
+      //   if (metadata?.redactedData) {
+      //     // from VSCode.
+      //     return [
+      //       {
+      //         type: 'redacted_thinking',
+      //         data: metadata.redactedData,
+      //       },
+      //     ];
+      //   } else if (metadata?._completeThinking) {
+      //     // from VSCode.
+      //     return [
+      //       {
+      //         type: 'thinking',
+      //         thinking: metadata._completeThinking,
+      //         signature: metadata.signature || '',
+      //       },
+      //     ];
+      //   } else {
+      //     const values =
+      //       typeof part.value === 'string' ? [part.value] : part.value;
+      //     return values.map((v) => ({
+      //       type: 'thinking',
+      //       thinking: v,
+      //       signature: '',
+      //     }));
+      //   }
+      return undefined;
+    } else if (part instanceof vscode.LanguageModelDataPart) {
+      if (isCacheControlMarker(part)) {
+        // ignore it, just use the officially recommended caching strategy.
+        return undefined;
+      } else if (isInternalMarker(part)) {
+        return undefined;
+      } else if (isImageMarker(part)) {
+        if (
+          role === vscode.LanguageModelChatMessageRole.Assistant ||
+          role === vscode.LanguageModelChatMessageRole.System ||
+          role === 'tool_result'
+        ) {
+          throw new Error(
+            'Tool call parts can not appear in system, assistant, or tool_result messages',
+          );
+        }
+        const mimeType = normalizeImageMimeType(part.mimeType);
+        if (!mimeType) {
+          throw new Error(
+            `Unsupported image mime type for provider: ${part.mimeType}`,
+          );
+        }
+        return {
+          parts: [
+            {
+              type: 'image_url',
+              image_url: {
+                url: `data:${part.mimeType};base64,${Buffer.from(
+                  part.data,
+                ).toString('base64')}`,
+              },
+            },
+          ],
+        };
+      } else {
+        throw new Error(
+          `Unsupported ${role} message LanguageModelDataPart mime type: ${part.mimeType}`,
+        );
+      }
+    } else if (part instanceof vscode.LanguageModelToolCallPart) {
+      if (role !== vscode.LanguageModelChatMessageRole.Assistant) {
+        throw new Error(
+          'Tool call parts can only appear in assistant messages',
+        );
+      }
+      return {
+        parts: [
+          {
+            id: part.callId,
+            type: 'function',
+            function: {
+              name: part.name,
+              arguments: this.stringifyArguments(part.input),
+            },
+          },
+        ],
+        isToolCall: true,
+      };
+    } else if (
+      part instanceof vscode.LanguageModelToolResultPart ||
+      part instanceof vscode.LanguageModelToolResultPart2
+    ) {
+      if (role !== vscode.LanguageModelChatMessageRole.User) {
+        throw new Error('Tool result parts can only appear in user messages');
+      }
+      const content = part.content
+        .map(
+          (v) =>
+            this.convertPart('tool_result', v)?.parts as
+              | ChatCompletionContentPartText[]
+              | undefined,
+        )
+        .filter((v) => v !== undefined)
+        .flat();
+      return {
+        parts:
+          content.length > 1
+            ? content
+            : content.length > 0
+            ? content[0].text
+            : '',
+        isToolResult: true,
+        toolResultId: part.callId,
+      };
+    } else {
+      throw new Error(`Unsupported ${role} message part type encountered`);
+    }
   }
 
   private convertTools(
@@ -383,20 +342,15 @@ export class OpenAIChatCompletionProvider implements ApiProvider {
       return undefined;
     }
     return tools.map((tool) => ({
-      type: 'function' as const,
+      type: 'function',
       function: {
         name: tool.name,
         description: tool.description,
-        parameters: (() => {
-          if (tool.inputSchema && typeof tool.inputSchema === 'object') {
-            return tool.inputSchema as ChatCompletionFunctionTool['function']['parameters'];
-          }
-          return {
-            type: 'object',
-            properties: {},
-            required: [],
-          } as ChatCompletionFunctionTool['function']['parameters'];
-        })(),
+        parameters: (tool.inputSchema ?? {
+          type: 'object',
+          properties: {},
+          required: [],
+        }) as FunctionParameters,
       },
     }));
   }
@@ -420,180 +374,13 @@ export class OpenAIChatCompletionProvider implements ApiProvider {
     return undefined;
   }
 
-  private recordFirstToken(
-    performanceTrace: PerformanceTrace,
-    recorded: { value: boolean },
-  ): void {
-    if (!recorded.value) {
-      recorded.value = true;
-      performanceTrace.ttft =
-        Date.now() - (performanceTrace.tts + performanceTrace.ttf);
-    }
-  }
-
-  private parseAndEmitToolCalls(
-    toolStates: Map<number, ToolCallState>,
-    performanceTrace: PerformanceTrace,
-    firstTokenRecorded: { value: boolean },
-  ): vscode.LanguageModelResponsePart2[] {
-    const results: vscode.LanguageModelResponsePart2[] = [];
-    for (const [index, state] of toolStates.entries()) {
-      if (!state.name) {
-        continue;
-      }
-      try {
-        const parsed = JSON.parse(state.args || '{}');
-        const parsedObject =
-          typeof parsed === 'object' && parsed !== null ? parsed : {};
-        this.recordFirstToken(performanceTrace, firstTokenRecorded);
-        results.push(
-          new vscode.LanguageModelToolCallPart(
-            state.id ?? `tool_call_${index}`,
-            state.name,
-            parsedObject,
-          ),
-        );
-        toolStates.delete(index);
-      } catch {
-        continue;
-      }
-    }
-    return results;
-  }
-
-  private async *handleStream(
-    stream: AsyncIterable<ChatCompletionChunk>,
-    performanceTrace: PerformanceTrace,
-    token: vscode.CancellationToken,
-    logger: RequestLogger,
-    usage: { value?: CompletionUsage },
-    emitReasoningContent: boolean,
-  ): AsyncGenerator<vscode.LanguageModelResponsePart2> {
-    const toolStates = new Map<number, ToolCallState>();
-    const firstTokenRecorded = { value: false };
-
-    for await (const chunk of stream) {
-      if (token.isCancellationRequested) {
-        break;
-      }
-
-      logger.providerResponseChunk(JSON.stringify(chunk));
-      if (chunk.usage) {
-        usage.value = chunk.usage;
-      }
-
-      const choice = chunk.choices[0];
-      if (!choice) {
-        continue;
-      }
-
-      if (emitReasoningContent) {
-        const reasoningDelta = (choice.delta as any).reasoning_content;
-        if (typeof reasoningDelta === 'string' && reasoningDelta) {
-          this.recordFirstToken(performanceTrace, firstTokenRecorded);
-          yield new vscode.LanguageModelThinkingPart(reasoningDelta);
-        }
-      }
-
-      const deltaContent = choice.delta.content;
-      if (typeof deltaContent === 'string' && deltaContent) {
-        this.recordFirstToken(performanceTrace, firstTokenRecorded);
-        yield new vscode.LanguageModelTextPart(deltaContent);
-      }
-
-      if (choice.delta.tool_calls) {
-        for (const call of choice.delta.tool_calls) {
-          if (call.type && call.type !== 'function') {
-            continue;
-          }
-          const existing = toolStates.get(call.index) ?? { args: '' };
-          if (call.id) existing.id = call.id;
-          if (call.function?.name) existing.name = call.function.name;
-          if (call.function?.arguments) {
-            existing.args += call.function.arguments;
-          }
-          toolStates.set(call.index, existing);
-        }
-      }
-
-      if (choice.finish_reason) {
-        if (toolStates.size > 0) {
-          const emitted = this.parseAndEmitToolCalls(
-            toolStates,
-            performanceTrace,
-            firstTokenRecorded,
-          );
-          for (const part of emitted) {
-            yield part;
-          }
-        }
-      }
-    }
-  }
-
-  private async *handleNonStream(
-    response: ChatCompletion,
-    performanceTrace: PerformanceTrace,
-    logger: RequestLogger,
-    usage: { value?: CompletionUsage },
-    emitReasoningContent: boolean,
-  ): AsyncGenerator<vscode.LanguageModelResponsePart2> {
-    logger.providerResponseChunk(JSON.stringify(response));
-
-    if (response.usage) {
-      usage.value = response.usage;
-    }
-
-    const choice = response.choices[0];
-    if (!choice) {
-      throw new Error('OpenAI response did not include any choices');
-    }
-
-    const firstTokenRecorded = { value: false };
-
-    if (emitReasoningContent) {
-      const reasoningContent = (choice.message as any).reasoning_content;
-      if (typeof reasoningContent === 'string' && reasoningContent) {
-        this.recordFirstToken(performanceTrace, firstTokenRecorded);
-        yield new vscode.LanguageModelThinkingPart(reasoningContent);
-      }
-    }
-
-    const messageContent = choice.message.content;
-    if (typeof messageContent === 'string' && messageContent) {
-      this.recordFirstToken(performanceTrace, firstTokenRecorded);
-      yield new vscode.LanguageModelTextPart(messageContent);
-    }
-
-    if (choice.message.tool_calls) {
-      for (const call of choice.message.tool_calls) {
-        if (call.type !== 'function' || !call.function) {
-          continue;
-        }
-        const args = call.function.arguments ?? '{}';
-        let parsed: Record<string, unknown> = {};
-        try {
-          const value = JSON.parse(args);
-          parsed = typeof value === 'object' && value !== null ? value : {};
-        } catch {
-          parsed = {};
-        }
-        this.recordFirstToken(performanceTrace, firstTokenRecorded);
-        yield new vscode.LanguageModelToolCallPart(
-          call.id,
-          call.function.name,
-          parsed,
-        );
-      }
-    }
-  }
-
   async *streamChat(
+    encodedModelId: string,
     model: ModelConfig,
-    messages: readonly vscode.LanguageModelChatRequestMessage[],
-    options: vscode.ProvideLanguageModelChatResponseOptions,
+    messages: readonly LanguageModelChatRequestMessage[],
+    options: ProvideLanguageModelChatResponseOptions,
     performanceTrace: PerformanceTrace,
-    token: vscode.CancellationToken,
+    token: CancellationToken,
     logger: RequestLogger,
   ): AsyncGenerator<vscode.LanguageModelResponsePart2> {
     const abortController = new AbortController();
@@ -601,19 +388,7 @@ export class OpenAIChatCompletionProvider implements ApiProvider {
       abortController.abort();
     });
 
-    const emitReasoningContent =
-      isFeatureSupported(FeatureId.OpenAIReasoningContent, model) ||
-      isFeatureSupported(FeatureId.OpenAIConciseReasoningContent, model);
-    const keepAllReasoningContent = isFeatureSupported(
-      FeatureId.OpenAIReasoningContent,
-      model,
-    );
-
-    const convertedMessages = this.convertMessages(
-      messages,
-      emitReasoningContent,
-      keepAllReasoningContent,
-    );
+    const convertedMessages = this.convertMessages(encodedModelId, messages);
     const tools = this.convertTools(options.tools);
     const toolChoice = this.convertToolChoice(options.toolMode, tools);
     const streamEnabled = model.stream ?? true;
@@ -647,80 +422,302 @@ export class OpenAIChatCompletionProvider implements ApiProvider {
         : {}),
       ...(tools !== undefined ? { tools } : {}),
       ...(toolChoice !== undefined ? { tool_choice: toolChoice } : {}),
+      stream: streamEnabled,
+      ...(streamEnabled ? { stream_options: { include_usage: true } } : {}),
     };
-
-    const streamingPayload: ChatCompletionCreateParamsStreaming = {
-      ...baseBody,
-      stream: true,
-      stream_options: { include_usage: true },
-    };
-
-    const nonStreamingPayload = { ...baseBody, stream: false as const };
-
-    const requestPayload = streamEnabled
-      ? streamingPayload
-      : nonStreamingPayload;
 
     logger.providerRequest({
       provider: this.config.name,
       modelId: model.id,
       endpoint: this.endpoint,
       headers: this.buildHeaders(),
-      body: requestPayload,
+      body: baseBody,
     });
-
-    const usage: { value?: CompletionUsage } = {};
 
     const client = this.createClient(logger);
 
+    performanceTrace.ttf = Date.now() - performanceTrace.tts;
+
     try {
       if (streamEnabled) {
-        performanceTrace.ttf = Date.now() - performanceTrace.tts;
-        const streamResponse = await client.chat.completions.create(
-          streamingPayload,
-          { signal: abortController.signal },
-        );
-        yield* this.handleStream(
-          streamResponse as AsyncIterable<ChatCompletionChunk>,
-          performanceTrace,
-          token,
-          logger,
-          usage,
-          emitReasoningContent,
-        );
+        const { data: stream, response } = await client.chat.completions
+          .create(
+            { ...baseBody, stream: true },
+            {
+              signal: abortController.signal,
+            },
+          )
+          .withResponse();
+        logger.providerResponseMeta(response);
+        yield* this.parseMessageStream(stream, token, logger, performanceTrace);
       } else {
-        performanceTrace.ttf = Date.now() - performanceTrace.tts;
-        const response = await client.chat.completions.create(
-          nonStreamingPayload,
-          { signal: abortController.signal },
-        );
-        yield* this.handleNonStream(
-          response,
-          performanceTrace,
-          logger,
-          usage,
-          emitReasoningContent,
-        );
-      }
-
-      if (usage.value?.completion_tokens) {
-        performanceTrace.tps =
-          (usage.value.completion_tokens /
-            (Date.now() - (performanceTrace.tts + performanceTrace.ttf))) *
-          1000;
-      } else {
-        performanceTrace.tps = NaN;
-      }
-
-      if (usage.value) {
-        logger.usage(usage.value);
+        const { data, response } = await client.chat.completions
+          .create(
+            { ...baseBody, stream: false },
+            {
+              signal: abortController.signal,
+            },
+          )
+          .withResponse();
+        logger.providerResponseMeta(response);
+        yield* this.parseMessage(data, performanceTrace, logger);
       }
     } finally {
       cancellationListener.dispose();
     }
   }
 
+  private async *parseMessage(
+    message: ChatCompletion,
+    performanceTrace: PerformanceTrace,
+    logger: RequestLogger,
+  ): AsyncGenerator<vscode.LanguageModelResponsePart2> {
+    // NOTE: The current behavior of VSCode is such that all Parts returned here will be
+    // aggregated into a single Part during the next request, and only the Thought part
+    // will be retained during the tool invocation round; most other types of Parts
+    // will be directly ignored, which can prevent us from sending the original data
+    // to the model provider and thus compromise full context and prompt caching support.
+    // we can only use two approaches simultaneously:
+    // 1. use the metadata attribute already in use in vscode-copilot-chat to restore the Thought part,
+    // ensuring basic compatibility across different models.
+    // 2. always send a StatefulMarker DataPart containing the complete, raw response data, to maximize context restoration.
+
+    logger.providerResponseChunk(JSON.stringify(message));
+
+    performanceTrace.ttft =
+      Date.now() - (performanceTrace.tts + performanceTrace.ttf);
+
+    const choice = message.choices[0];
+    if (!choice) {
+      throw new Error('OpenAI response did not include any choices');
+    }
+
+    const raw = choice.message;
+    const { content, tool_calls } = choice.message;
+
+    if (content) {
+      yield new vscode.LanguageModelTextPart(content);
+    }
+
+    if (tool_calls) {
+      for (const call of tool_calls) {
+        if (call.type === 'function') {
+          yield new vscode.LanguageModelToolCallPart(
+            call.id,
+            call.function.name,
+            this.parseArguments(call),
+          );
+        } else {
+          throw new Error(`Unsupported tool call type: ${call.type}`);
+        }
+      }
+    }
+
+    yield encodeStatefulMarkerPart<ChatCompletionMessage>(raw);
+
+    if (message.usage) {
+      this.processUsage(message.usage, performanceTrace, logger);
+    }
+  }
+
+  private stringifyArguments(input: unknown): string {
+    try {
+      return JSON.stringify(input ?? {});
+    } catch {
+      return '{}';
+    }
+  }
+
+  private parseArguments(
+    call: OpenAI.Chat.Completions.ChatCompletionMessageFunctionToolCall,
+  ) {
+    let parsedArgs: object = {};
+    try {
+      const value = JSON.parse(call.function.arguments);
+      parsedArgs = typeof value === 'object' && value !== null ? value : {};
+    } catch {
+      parsedArgs = {};
+    }
+    return parsedArgs;
+  }
+
+  private async *parseMessageStream(
+    stream: Stream<OpenAI.Chat.Completions.ChatCompletionChunk>,
+    token: vscode.CancellationToken,
+    logger: RequestLogger,
+    performanceTrace: PerformanceTrace,
+  ): AsyncGenerator<vscode.LanguageModelResponsePart2> {
+    let snapshot: ChatCompletionSnapshot | undefined;
+    let usage: CompletionUsage | null | undefined;
+
+    let firstTokenRecorded = false;
+    const recordFirstToken = () => {
+      if (!firstTokenRecorded) {
+        performanceTrace.ttft =
+          Date.now() - (performanceTrace.tts + performanceTrace.ttf);
+        firstTokenRecorded = true;
+      }
+    };
+
+    for await (const event of stream) {
+      if (token.isCancellationRequested) {
+        break;
+      }
+
+      logger.providerResponseChunk(JSON.stringify(event));
+
+      snapshot = this.accumulateChatCompletion(snapshot, event);
+      if (event.usage) usage = event.usage;
+
+      const choice = event.choices[0];
+      if (!choice) {
+        continue;
+      }
+
+      const { content } = choice.delta;
+
+      recordFirstToken();
+
+      if (content) {
+        yield new vscode.LanguageModelTextPart(content);
+      }
+
+      if (choice.finish_reason) {
+        const message = snapshot.choices[choice.index].message;
+        const tool_calls = message.tool_calls;
+        if (tool_calls && tool_calls.length > 0) {
+          for (const call of tool_calls) {
+            if (call.type === 'function') {
+              yield new vscode.LanguageModelToolCallPart(
+                call.id,
+                call.function.name,
+                this.parseArguments(call),
+              );
+            }
+          }
+        }
+        yield encodeStatefulMarkerPart<ChatCompletionMessage>({
+          content: message.content ?? null,
+          refusal: message.refusal ?? null,
+          role: 'assistant',
+          tool_calls: message.tool_calls ?? undefined,
+        });
+      }
+    }
+
+    if (usage) {
+      this.processUsage(usage, performanceTrace, logger);
+    }
+  }
+
+  accumulateChatCompletion(
+    snapshot: ChatCompletionSnapshot | undefined,
+    chunk: ChatCompletionChunk,
+  ): ChatCompletionSnapshot {
+    const { choices, ...rest } = chunk;
+    if (!snapshot) {
+      snapshot = {
+        ...rest,
+        choices: [],
+      };
+    } else {
+      Object.assign(snapshot, rest);
+    }
+
+    for (const {
+      delta,
+      finish_reason,
+      index,
+      logprobs = null,
+      ...other
+    } of chunk.choices) {
+      let choice = snapshot.choices[index];
+      if (!choice) {
+        choice = snapshot.choices[index] = {
+          finish_reason,
+          index,
+          message: {},
+          logprobs,
+          ...other,
+        };
+      }
+
+      if (logprobs) {
+        if (!choice.logprobs) {
+          choice.logprobs = Object.assign({}, logprobs);
+        } else {
+          const { content, refusal } = logprobs;
+
+          if (content) {
+            choice.logprobs.content ??= [];
+            choice.logprobs.content.push(...content);
+          }
+
+          if (refusal) {
+            choice.logprobs.refusal ??= [];
+            choice.logprobs.refusal.push(...refusal);
+          }
+        }
+      }
+
+      if (finish_reason) {
+        choice.finish_reason = finish_reason;
+      }
+
+      Object.assign(choice, other);
+
+      if (!delta) continue; // Shouldn't happen; just in case.
+
+      const { content, refusal, role, tool_calls } = delta;
+
+      if (refusal) {
+        choice.message.refusal = (choice.message.refusal || '') + refusal;
+      }
+
+      if (role) choice.message.role = role;
+      if (content) {
+        choice.message.content = (choice.message.content || '') + content;
+      }
+
+      if (tool_calls) {
+        if (!choice.message.tool_calls) choice.message.tool_calls = [];
+
+        for (const { index, id, type, function: fn, ...rest } of tool_calls) {
+          const tool_call = (choice.message.tool_calls[index] ??=
+            {} as ChatCompletionSnapshot.Choice.Message.ToolCall);
+          Object.assign(tool_call, rest);
+          if (id) tool_call.id = id;
+          if (type) tool_call.type = type;
+          if (fn) tool_call.function ??= { name: fn.name ?? '', arguments: '' };
+          if (fn?.name) tool_call.function!.name = fn.name;
+          if (fn?.arguments) {
+            tool_call.function!.arguments += fn.arguments;
+          }
+        }
+      }
+    }
+
+    return snapshot;
+  }
+
+  private processUsage(
+    usage: CompletionUsage,
+    performanceTrace: PerformanceTrace,
+    logger: RequestLogger,
+  ) {
+    if (usage.completion_tokens) {
+      performanceTrace.tps =
+        (usage.completion_tokens /
+          (Date.now() - (performanceTrace.tts + performanceTrace.ttf))) *
+        1000;
+    } else {
+      performanceTrace.tps = NaN;
+    }
+    logger.usage(usage);
+  }
+
   estimateTokenCount(text: string): number {
+    // Rough estimation: ~4 characters per token for English text
     return Math.ceil(text.length / 4);
   }
 

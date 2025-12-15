@@ -127,6 +127,7 @@ export interface ApiProvider {
    * Stream a chat response
    */
   streamChat(
+    encodedModelId: string,
     model: ModelConfig,
     messages: readonly LanguageModelChatRequestMessage[],
     options: ProvideLanguageModelChatResponseOptions,

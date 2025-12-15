@@ -177,6 +177,7 @@ export class UnifyChatService implements vscode.LanguageModelChatProvider {
 
     // Stream the response
     const stream = client.streamChat(
+      model.id,
       modelConfig,
       messages,
       options,

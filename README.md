@@ -122,6 +122,12 @@ This includes:
 - Build: `npm run compile`
 - Watch: `npm run watch`
 
+## Roadmap
+
+- The `nativeTool` should include a configuration option within `ModelConfig`. In addition to `Default`, `Enable`, and `Disable`, add an `Auto` option that automatically selects the appropriate setting based on the model family. Also, include native tool implementations for various models to force a specific choice. Remove the related `Features`. Add the `Anthropic WebFetchTool` and ensure that citation content is handled correctly (it may not be displayed directly).
+- Precise cache control to reduce the amount of network data.
+- Support monitoring of balance usage.
+
 ## License
 
 MIT

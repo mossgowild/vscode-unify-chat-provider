@@ -14,6 +14,7 @@ import type {
   BetaToolUnion,
   BetaUsage,
   MessageCreateParamsStreaming,
+  BetaTool,
 } from '@anthropic-ai/sdk/resources/beta/messages';
 import type { RequestLogger } from '../../logger';
 import { ApiProvider, ProviderConfig, ModelConfig } from '../interface';
@@ -21,15 +22,16 @@ import {
   normalizeBaseUrlInput,
   fetchWithRetry,
   DEFAULT_RETRY_CONFIG,
+  isCacheControlMarker,
+  isImageMarker,
+  isInternalMarker,
+  encodeStatefulMarkerPart,
+  decodeStatefulMarkerPart,
+  normalizeImageMimeType,
 } from '../../utils';
 import { getBaseModelId } from '../../model-id-utils';
 import { DEFAULT_MAX_OUTPUT_TOKENS } from '../../defaults';
-import {
-  DataPartMimeTypes,
-  PerformanceTrace,
-  StatefulMarkerData,
-  ThinkingBlockMetadata,
-} from '../../types';
+import { PerformanceTrace, ThinkingBlockMetadata } from '../../types';
 import { FeatureId, isFeatureSupported } from '../../features';
 import { createHash, randomBytes, randomUUID } from 'node:crypto';
 import { WELL_KNOWN_MODELS } from '../../well-known-models';
@@ -42,11 +44,11 @@ import { TracksToolInput } from '@anthropic-ai/sdk/lib/BetaMessageStream';
 // TODO Context editing support
 export class AnthropicProvider implements ApiProvider {
   private readonly baseUrl: string;
-  private readonly messagesEndpoint: string;
+  private readonly endpoint: string;
 
   constructor(private readonly config: ProviderConfig) {
     this.baseUrl = this.buildBaseUrl(config.baseUrl);
-    this.messagesEndpoint = `${this.baseUrl}/v1/messages`;
+    this.endpoint = `${this.baseUrl}/v1/messages`;
   }
 
   /**
@@ -120,6 +122,7 @@ export class AnthropicProvider implements ApiProvider {
    * Convert VS Code messages to Anthropic format
    */
   private convertMessages(
+    encodedModelId: string,
     messages: readonly vscode.LanguageModelChatRequestMessage[],
   ): {
     system?: string | BetaTextBlockParam[];
@@ -127,7 +130,7 @@ export class AnthropicProvider implements ApiProvider {
   } {
     const outMessages: BetaMessageParam[] = [];
     const system: BetaTextBlockParam[] = [];
-    let rawAnthropics = new Map<BetaMessageParam, BetaMessage>();
+    const rawMap = new Map<BetaMessageParam, BetaMessage>();
 
     for (const msg of messages) {
       switch (msg.role) {
@@ -148,21 +151,20 @@ export class AnthropicProvider implements ApiProvider {
           break;
 
         case vscode.LanguageModelChatMessageRole.Assistant:
-          const message: BetaMessageParam = {
-            role: 'assistant',
-            content: '',
-          };
-
           const rawPart = msg.content.find(
             (v) => v instanceof vscode.LanguageModelDataPart,
           ) as vscode.LanguageModelDataPart | undefined;
           if (rawPart) {
             try {
               const raw = rawPart
-                ? this.decodeStatefulMarkerPart(rawPart)
+                ? decodeStatefulMarkerPart<BetaMessage>(encodedModelId, rawPart)
                 : undefined;
               if (raw) {
-                rawAnthropics.set(message, raw);
+                const message: BetaMessageParam = {
+                  role: 'assistant',
+                  content: '',
+                };
+                rawMap.set(message, raw);
                 outMessages.push(message);
               }
             } catch (error) {}
@@ -212,7 +214,7 @@ export class AnthropicProvider implements ApiProvider {
     }
 
     // use raw messages, for details, see parseMessage's NOTE comments.
-    for (const [param, raw] of rawAnthropics) {
+    for (const [param, raw] of rawMap) {
       const index = outMessages.indexOf(param);
       outMessages[index].content = raw.content;
     }
@@ -269,16 +271,19 @@ export class AnthropicProvider implements ApiProvider {
         }));
       }
     } else if (part instanceof vscode.LanguageModelDataPart) {
-      if (this.isCacheControlMarker(part)) {
+      if (isCacheControlMarker(part)) {
         // ignore it, just use the officially recommended caching strategy.
         return undefined;
-      } else if (this.isInternalMarker(part)) {
+      } else if (isInternalMarker(part)) {
         return undefined;
-      } else if (this.isImageMarker(part)) {
+      } else if (isImageMarker(part)) {
+        if (role === vscode.LanguageModelChatMessageRole.System) {
+          throw new Error('Tool call parts can not appear in system messages');
+        }
         const mimeType = normalizeImageMimeType(part.mimeType);
         if (!mimeType) {
           throw new Error(
-            `Unsupported image mime type for Anthropic provider: ${part.mimeType}`,
+            `Unsupported image mime type for provider: ${part.mimeType}`,
           );
         }
         return [
@@ -314,13 +319,8 @@ export class AnthropicProvider implements ApiProvider {
       part instanceof vscode.LanguageModelToolResultPart ||
       part instanceof vscode.LanguageModelToolResultPart2
     ) {
-      if (
-        role === 'tool_result' ||
-        role === vscode.LanguageModelChatMessageRole.System
-      ) {
-        throw new Error(
-          'Tool result parts can only appear in assistant or user messages',
-        );
+      if (role !== vscode.LanguageModelChatMessageRole.User) {
+        throw new Error('Tool result parts can only appear in user messages');
       }
       const content = part.content
         .map(
@@ -343,10 +343,6 @@ export class AnthropicProvider implements ApiProvider {
     }
   }
 
-  /**
-   * Check if a content block supports cache_control.
-   * Thinking, redacted_thinking, server_tool_use, and web_search_tool_result blocks do not support cache_control.
-   */
   private isCacheControlApplicableBlock(
     block: BetaContentBlockParam,
   ): block is Exclude<
@@ -354,25 +350,6 @@ export class AnthropicProvider implements ApiProvider {
     BetaThinkingBlockParam | BetaRedactedThinkingBlockParam
   > {
     return block.type !== 'thinking' && block.type !== 'redacted_thinking';
-  }
-
-  /**
-   * Extract the cache control value from a LanguageModelDataPart.
-   * Returns true if the data represents an ephemeral cache control marker.
-   */
-  private isCacheControlMarker(part: vscode.LanguageModelDataPart): boolean {
-    return (
-      part.mimeType === DataPartMimeTypes.CacheControl &&
-      part.data.toString() === 'ephemeral'
-    );
-  }
-
-  private isInternalMarker(part: vscode.LanguageModelDataPart): boolean {
-    return part.mimeType === DataPartMimeTypes.StatefulMarker;
-  }
-
-  private isImageMarker(part: vscode.LanguageModelDataPart): boolean {
-    return part.mimeType.startsWith('image/');
   }
 
   /**
@@ -548,7 +525,7 @@ export class AnthropicProvider implements ApiProvider {
 
       if (tools.length === 1) {
         const tool = tools[0];
-        if (!hasToolName(tool)) {
+        if (!('name' in tool)) {
           throw new Error('Selected tool does not have a name');
         }
         return { type: 'tool', name: tool.name };
@@ -613,6 +590,7 @@ export class AnthropicProvider implements ApiProvider {
    * Send a streaming chat request
    */
   async *streamChat(
+    encodedModelId: string,
     model: ModelConfig,
     messages: readonly vscode.LanguageModelChatRequestMessage[],
     options: vscode.ProvideLanguageModelChatResponseOptions,
@@ -637,8 +615,10 @@ export class AnthropicProvider implements ApiProvider {
       hasTools &&
       interleavedThinkingSupported;
 
-    const { system, messages: anthropicMessages } =
-      this.convertMessages(messages);
+    const { system, messages: anthropicMessages } = this.convertMessages(
+      encodedModelId,
+      messages,
+    );
 
     // Convert tools with model config for web search and memory tool support
     // Also add tools if web search is enabled even without explicit tools
@@ -741,14 +721,14 @@ export class AnthropicProvider implements ApiProvider {
       logger.providerRequest({
         provider: this.config.name,
         modelId: model.id,
-        endpoint: this.messagesEndpoint,
+        endpoint: this.endpoint,
         headers,
         body: { ...requestBase, stream },
       });
 
-      performanceTrace.ttf = Date.now() - performanceTrace.tts;
-
       const client = this.createClient(logger);
+
+      performanceTrace.ttf = Date.now() - performanceTrace.tts;
 
       if (stream) {
         const requestBody: MessageCreateParamsStreaming = {
@@ -805,6 +785,8 @@ export class AnthropicProvider implements ApiProvider {
     // 2. always send a StatefulMarker DataPart containing the complete, raw response data, to maximize context restoration.
     const raw: BetaMessage = message;
 
+    logger.providerResponseChunk(JSON.stringify(message));
+
     performanceTrace.ttft =
       Date.now() - (performanceTrace.tts + performanceTrace.ttf);
 
@@ -848,7 +830,7 @@ export class AnthropicProvider implements ApiProvider {
           throw new Error(`Unsupported message block type: ${block.type}`);
       }
     }
-    yield this.encodeStatefulMarkerPart(raw);
+    yield encodeStatefulMarkerPart<BetaMessage>(raw);
 
     if (message.usage) {
       this.processUsage(message.usage, performanceTrace, logger);
@@ -962,7 +944,7 @@ export class AnthropicProvider implements ApiProvider {
         }
 
         case 'message_stop': {
-          yield this.encodeStatefulMarkerPart(raw);
+          yield encodeStatefulMarkerPart<BetaMessage>(raw);
 
           if (raw.usage) {
             this.processUsage(raw.usage, performanceTrace, logger);
@@ -987,35 +969,6 @@ export class AnthropicProvider implements ApiProvider {
         }
       }
     }
-  }
-
-  private encodeStatefulMarkerPart(
-    raw: BetaMessage,
-  ): vscode.LanguageModelDataPart {
-    const rawBase64: StatefulMarkerData = `[MODELID]\\${Buffer.from(
-      JSON.stringify(raw),
-    ).toString('base64')}`;
-    return new vscode.LanguageModelDataPart(
-      Buffer.from(rawBase64),
-      DataPartMimeTypes.StatefulMarker,
-    );
-  }
-
-  private decodeStatefulMarkerPart(
-    part: vscode.LanguageModelDataPart,
-  ): BetaMessage {
-    if (part.mimeType !== DataPartMimeTypes.StatefulMarker) {
-      throw new Error(
-        `Invalid raw message stateful marker data mime type: ${part.mimeType}`,
-      );
-    }
-    const rawStr = part.data.toString();
-    const match = rawStr.match(/^.+?\\(.+)$/);
-    if (!match) {
-      throw new Error('Invalid raw message stateful marker data format');
-    }
-    const rawJson = Buffer.from(match[1], 'base64').toString('utf-8');
-    return JSON.parse(rawJson) as BetaMessage;
   }
 
   private accumulateMessage(
@@ -1234,79 +1187,35 @@ export class AnthropicProvider implements ApiProvider {
 // TODO: should we use identifiers that are not easily changed as the user part.
 const USER_ID = generateClaudeUserId();
 
-/**
- * 生成 ClaudeCode 风格的 user_id
- * 格式: user_{SHA256}_account__session_{UUID}
- * * @param seedInput - 可选：用于生成哈希的种子字符串（如邮箱、用户名）。如果不传，则随机生成。
- * @returns 格式化后的 user_id 字符串
- */
 function generateClaudeUserId(seedInput?: string): string {
-  // 1. 生成 SHA-256 部分 (64字符)
   let hashContent: string | Buffer;
 
   if (seedInput) {
     hashContent = seedInput;
   } else {
-    // 如果没有输入，生成随机的高熵字节作为哈希源
     hashContent = randomBytes(32);
   }
 
-  // 计算 SHA-256 哈希值并转为十六进制字符串
   const sha256Part = createHash('sha256').update(hashContent).digest('hex');
-
-  // 2. 生成会话 UUID 部分 (标准 UUID v4)
   const uuidPart = randomUUID();
-
-  // 3. 拼接字符串
   return `user_${sha256Part}_account__session_${uuidPart}`;
 }
 
-const SUPPORTED_BASE64_IMAGE_MIME_TYPES = [
-  'image/jpeg',
-  'image/png',
-  'image/gif',
-  'image/webp',
-] as const;
-
-type SupportedBase64ImageMimeType =
-  (typeof SUPPORTED_BASE64_IMAGE_MIME_TYPES)[number];
-
-function normalizeImageMimeType(
-  mimeType: string,
-): SupportedBase64ImageMimeType | undefined {
-  if (mimeType === 'image/jpg') {
-    return 'image/jpeg';
-  }
-  return (SUPPORTED_BASE64_IMAGE_MIME_TYPES as readonly string[]).includes(
-    mimeType,
-  )
-    ? (mimeType as SupportedBase64ImageMimeType)
-    : undefined;
-}
-
-type InputSchema = {
-  type: 'object';
-  properties?: unknown | null;
-  required?: string[] | readonly string[] | null;
-  [key: string]: unknown;
-};
-
-function normalizeInputSchema(schema: unknown): InputSchema {
-  if (schema && typeof schema === 'object') {
-    const record = schema as Record<string, unknown>;
-    if (record.type === 'object') {
-      return record as InputSchema;
-    }
+function normalizeInputSchema(
+  schema: object | undefined,
+): BetaTool.InputSchema {
+  if (!schema) {
+    return {
+      type: 'object',
+      properties: {},
+      required: [],
+    };
   }
   return {
     type: 'object',
-    properties: {},
-    required: [],
+    properties:
+      (schema as { properties?: Record<string, unknown> }).properties ?? {},
+    required: (schema as { required?: string[] }).required ?? [],
+    $schema: (schema as { $schema?: unknown }).$schema,
   };
-}
-
-function hasToolName(
-  tool: BetaToolUnion,
-): tool is Extract<BetaToolUnion, { name: string }> {
-  return 'name' in tool;
 }

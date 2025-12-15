@@ -1,4 +1,6 @@
 import type { RequestLogger } from './logger';
+import * as vscode from 'vscode';
+import { DataPartMimeTypes, StatefulMarkerData } from './types';
 
 /**
  * HTTP status codes that should trigger a retry.
@@ -54,6 +56,10 @@ export function isRetryableStatusCode(status: number): boolean {
  */
 function delay(ms: number): Promise<void> {
   return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+function escapeRegExp(value: string): string {
+  return value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 }
 
 /**
@@ -176,4 +182,75 @@ export function normalizeBaseUrlInput(raw: string): string {
   // URL.toString re-adds a trailing slash when pathname is empty; strip it.
   const normalized = parsed.toString().replace(/\/+$/, '');
   return normalized;
+}
+
+export function isCacheControlMarker(
+  part: vscode.LanguageModelDataPart,
+): boolean {
+  return (
+    part.mimeType === DataPartMimeTypes.CacheControl &&
+    part.data.toString() === 'ephemeral'
+  );
+}
+
+export function isInternalMarker(part: vscode.LanguageModelDataPart): boolean {
+  return part.mimeType === DataPartMimeTypes.StatefulMarker;
+}
+
+export function isImageMarker(part: vscode.LanguageModelDataPart): boolean {
+  return part.mimeType.startsWith('image/');
+}
+
+export function encodeStatefulMarkerPart<T extends object>(
+  raw: T,
+): vscode.LanguageModelDataPart {
+  const rawBase64: StatefulMarkerData = `[MODELID]\\${Buffer.from(
+    JSON.stringify(raw),
+  ).toString('base64')}`;
+  return new vscode.LanguageModelDataPart(
+    Buffer.from(rawBase64),
+    DataPartMimeTypes.StatefulMarker,
+  );
+}
+
+export function decodeStatefulMarkerPart<T extends object>(
+  modelId: string,
+  part: vscode.LanguageModelDataPart,
+): T {
+  if (part.mimeType !== DataPartMimeTypes.StatefulMarker) {
+    throw new Error(
+      `Invalid raw message stateful marker data mime type: ${part.mimeType}`,
+    );
+  }
+  const rawStr = part.data.toString();
+  const match = rawStr.match(new RegExp(`^${escapeRegExp(modelId)}\\\\(.+)$`));
+  if (!match) {
+    throw new Error('Invalid raw message stateful marker data format');
+  }
+  const rawJson = Buffer.from(match[1], 'base64').toString('utf-8');
+  return JSON.parse(rawJson) as T;
+}
+
+const SUPPORTED_BASE64_IMAGE_MIME_TYPES = [
+  'image/jpeg',
+  'image/png',
+  'image/gif',
+  'image/webp',
+  // 'image/bmp',
+] as const;
+
+type SupportedBase64ImageMimeType =
+  (typeof SUPPORTED_BASE64_IMAGE_MIME_TYPES)[number];
+
+export function normalizeImageMimeType(
+  mimeType: string,
+): SupportedBase64ImageMimeType | undefined {
+  if (mimeType === 'image/jpg') {
+    return 'image/jpeg';
+  }
+  return (SUPPORTED_BASE64_IMAGE_MIME_TYPES as readonly string[]).includes(
+    mimeType,
+  )
+    ? (mimeType as SupportedBase64ImageMimeType)
+    : undefined;
 }
