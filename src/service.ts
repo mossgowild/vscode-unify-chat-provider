@@ -37,7 +37,7 @@ export class UnifyChatService implements vscode.LanguageModelChatProvider {
 
     // If no models configured and not silent, prompt user to add a provider
     if (models.length === 0 && !options.silent) {
-      vscode.commands.executeCommand('unifyChatProvider.addProvider');
+      vscode.commands.executeCommand('unifyChatProvider.manageProviders');
     }
 
     return models;
