@@ -14,6 +14,7 @@ interface WellKnownModelConfig extends ModelConfig {
 export const WELL_KNOWN_MODELS: WellKnownModelConfig[] = [
   {
     id: 'claude-sonnet-4-5',
+    alternativeIds: ['claude-sonnet-4.5'],
     name: 'Claude Sonnet 4.5',
     maxInputTokens: 200000,
     maxOutputTokens: 64000,
@@ -30,6 +31,7 @@ export const WELL_KNOWN_MODELS: WellKnownModelConfig[] = [
   },
   {
     id: 'claude-haiku-4-5',
+    alternativeIds: ['claude-haiku-4.5'],
     name: 'Claude Haiku 4.5',
     maxInputTokens: 200000,
     maxOutputTokens: 64000,
@@ -41,6 +43,7 @@ export const WELL_KNOWN_MODELS: WellKnownModelConfig[] = [
   },
   {
     id: 'claude-opus-4-5',
+    alternativeIds: ['claude-opus-4.5'],
     name: 'Claude Opus 4.5',
     maxInputTokens: 200000,
     maxOutputTokens: 64000,
@@ -57,6 +60,7 @@ export const WELL_KNOWN_MODELS: WellKnownModelConfig[] = [
   },
   {
     id: 'claude-opus-4-1',
+    alternativeIds: ['claude-opus-4.1'],
     name: 'Claude Opus 4.1',
     maxInputTokens: 200000,
     maxOutputTokens: 32000,
@@ -89,6 +93,7 @@ export const WELL_KNOWN_MODELS: WellKnownModelConfig[] = [
   },
   {
     id: 'claude-3-7-sonnet',
+    alternativeIds: ['claude-3.7-sonnet'],
     name: 'Claude Sonnet 3.7',
     maxInputTokens: 200000,
     maxOutputTokens: 64000,
@@ -120,6 +125,7 @@ export const WELL_KNOWN_MODELS: WellKnownModelConfig[] = [
   },
   {
     id: 'claude-3-5-haiku',
+    alternativeIds: ['claude-3.5-haiku'],
     name: 'Claude Haiku 3.5',
     maxInputTokens: 200000,
     maxOutputTokens: 8000,

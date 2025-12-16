@@ -436,19 +436,21 @@ export class AnthropicProvider implements ApiProvider {
    */
   private convertTools(
     tools: readonly vscode.LanguageModelChatTool[],
-    model?: ModelConfig,
+    model: ModelConfig,
   ): { tools: BetaToolUnion[]; hasMemoryTool: boolean } {
     const result: BetaToolUnion[] = [];
     let hasMemoryTool = false;
     let hasWebSearchTool = false;
 
-    const memoryToolEnabled = model?.memoryTool === true;
-    const memoryToolSupported = model
-      ? isFeatureSupported(FeatureId.AnthropicMemoryTool, model)
-      : false;
-    const webSearchSupported = model
-      ? isFeatureSupported(FeatureId.AnthropicWebSearch, model)
-      : false;
+    const memoryToolEnabled = model.memoryTool === true;
+    const memoryToolSupported = isFeatureSupported(
+      FeatureId.AnthropicMemoryTool,
+      model,
+    );
+    const webSearchSupported = isFeatureSupported(
+      FeatureId.AnthropicWebSearch,
+      model,
+    );
 
     for (const tool of tools) {
       // Handle native Anthropic memory tool - replaces local memory tool
@@ -476,7 +478,7 @@ export class AnthropicProvider implements ApiProvider {
 
     // Add web search server tool if enabled, supported, and no local web_search tool exists
     // This is because there is no local web_search tool definition we can replace
-    if (model?.webSearch?.enabled && webSearchSupported && !hasWebSearchTool) {
+    if (model.webSearch?.enabled && webSearchSupported && !hasWebSearchTool) {
       const webSearchTool: BetaToolUnion = {
         type: 'web_search_20250305',
         name: 'web_search',

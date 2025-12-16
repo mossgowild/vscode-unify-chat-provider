@@ -97,6 +97,7 @@ export class OpenAIChatCompletionProvider implements ApiProvider {
   private convertMessages(
     encodedModelId: string,
     messages: readonly vscode.LanguageModelChatRequestMessage[],
+    shouldApplyCacheControl: boolean,
   ): ChatCompletionMessageParam[] {
     const outMessages: ChatCompletionMessageParam[] = [];
     const rawMap = new Map<
@@ -204,7 +205,9 @@ export class OpenAIChatCompletionProvider implements ApiProvider {
     // TODO 将连续的不同种类的 Assistant 消息尽量合并为一条消息（比如 content, reasoning_content, tool_calls 可以合并，但是 content, content 则不可以合并，(content and reasoning_content), tool_calls 可以合并）
 
     // add a cache breakpoint at the end.
-    this.applyCacheControl(outMessages);
+    if (shouldApplyCacheControl) {
+      this.applyCacheControl(outMessages);
+    }
 
     return outMessages;
   }
@@ -443,7 +446,16 @@ export class OpenAIChatCompletionProvider implements ApiProvider {
       abortController.abort();
     });
 
-    const convertedMessages = this.convertMessages(encodedModelId, messages);
+    const shouldApplyCacheControl = isFeatureSupported(
+      FeatureId.OpenAICacheControl,
+      model,
+    );
+
+    const convertedMessages = this.convertMessages(
+      encodedModelId,
+      messages,
+      shouldApplyCacheControl,
+    );
     const tools = this.convertTools(options.tools);
     const toolChoice = this.convertToolChoice(options.toolMode, tools);
     const streamEnabled = model.stream ?? true;

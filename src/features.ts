@@ -23,6 +23,10 @@ export enum FeatureId {
    * @see https://api-docs.deepseek.com/zh-cn/guides/thinking_mode
    */
   OpenAIConciseReasoning = 'openai_concise-reasoning',
+  /**
+   * @see https://openrouter.ai/docs/guides/best-practices/prompt-caching
+   */
+  OpenAICacheControl = 'openai_cache-control',
 }
 
 export interface Feature {
@@ -41,29 +45,41 @@ export const FEATURES: Record<FeatureId, Feature> = {
   [FeatureId.AnthropicInterleavedThinking]: {
     supportedFamilys: [
       'claude-sonnet-4-5',
+      'claude-sonnet-4.5',
       'claude-sonnet-4',
       'claude-opus-4-5',
+      'claude-opus-4.5',
       'claude-opus-4-1',
+      'claude-opus-4.1',
       'claude-opus-4',
     ],
   },
   [FeatureId.AnthropicWebSearch]: {
     supportedFamilys: [
       'claude-sonnet-4-5',
+      'claude-sonnet-4.5',
       'claude-sonnet-4',
-      'claude-sonnet-3-7',
+      'claude-3-7-sonnet',
+      'claude-3.7-sonnet',
       'claude-haiku-4-5',
-      'claude-haiku-3-5',
+      'claude-haiku-4.5',
+      'claude-3-5-haiku',
+      'claude-3.5-haiku',
       'claude-opus-4-5',
+      'claude-opus-4.5',
       'claude-opus-4-1',
+      'claude-opus-4.1',
       'claude-opus-4',
     ],
   },
   [FeatureId.AnthropicMemoryTool]: {
     supportedFamilys: [
       'claude-sonnet-4-5',
+      'claude-sonnet-4.5',
       'claude-opus-4-5',
+      'claude-opus-4.5',
       'claude-opus-4-1',
+      'claude-opus-4.1',
       'claude-opus-4',
     ],
   },
@@ -95,6 +111,25 @@ export const FEATURES: Record<FeatureId, Feature> = {
   },
   [FeatureId.OpenAIConciseReasoning]: {
     supportedFamilys: ['deepseek-reasoner'],
+  },
+  [FeatureId.OpenAICacheControl]: {
+    supportedFamilys: [
+      'claude-sonnet-4-5',
+      'claude-sonnet-4.5',
+      'claude-sonnet-4',
+      'claude-3-7-sonnet',
+      'claude-3.7-sonnet',
+      'claude-haiku-4-5',
+      'claude-haiku-4.5',
+      'claude-3-5-haiku',
+      'claude-3.5-haiku',
+      'claude-3-haiku',
+      'claude-opus-4-5',
+      'claude-opus-4.5',
+      'claude-opus-4-1',
+      'claude-opus-4.1',
+      'claude-opus-4',
+    ],
   },
 };
 
