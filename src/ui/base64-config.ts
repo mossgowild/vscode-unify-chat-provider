@@ -1,6 +1,13 @@
 import * as vscode from 'vscode';
 import type { ModelConfig, ProviderConfig } from '../client/interface';
 import { generateAutoVersionedId } from '../model-id-utils';
+import {
+  deepClone,
+  mergePartialByKeys,
+  MODEL_CONFIG_KEYS,
+  PROVIDER_CONFIG_KEYS,
+  withoutKey,
+} from '../config-ops';
 
 /**
  * Encode a configuration object to Base64-URL string.
@@ -183,17 +190,12 @@ export function mergePartialProviderConfig(
   draft: Partial<ProviderConfig>,
   source: Partial<ProviderConfig>,
 ): void {
-  if (source.type !== undefined) draft.type = source.type;
-  if (source.name !== undefined) draft.name = source.name;
-  if (source.baseUrl !== undefined) draft.baseUrl = source.baseUrl;
-  if (source.apiKey !== undefined) draft.apiKey = source.apiKey;
-  if (source.mimic !== undefined) draft.mimic = source.mimic;
-  if (source.models !== undefined && Array.isArray(source.models)) {
-    draft.models = source.models.map((m) => ({ ...m }));
+  mergePartialByKeys(draft, source, withoutKey(PROVIDER_CONFIG_KEYS, 'models'));
+
+  const models = source.models;
+  if (models !== undefined && Array.isArray(models)) {
+    draft.models = deepClone(models);
   }
-  if (source.extraHeaders !== undefined)
-    draft.extraHeaders = { ...source.extraHeaders };
-  if (source.extraBody !== undefined) draft.extraBody = { ...source.extraBody };
 }
 
 /**
@@ -204,34 +206,7 @@ export function mergePartialModelConfig(
   draft: Partial<ModelConfig>,
   source: Partial<ModelConfig>,
 ): void {
-  if (source.id !== undefined) draft.id = source.id;
-  if (source.name !== undefined) draft.name = source.name;
-  if (source.family !== undefined) draft.family = source.family;
-  if (source.maxInputTokens !== undefined)
-    draft.maxInputTokens = source.maxInputTokens;
-  if (source.maxOutputTokens !== undefined)
-    draft.maxOutputTokens = source.maxOutputTokens;
-  if (source.capabilities !== undefined)
-    draft.capabilities = { ...source.capabilities };
-  if (source.stream !== undefined) draft.stream = source.stream;
-  if (source.temperature !== undefined) draft.temperature = source.temperature;
-  if (source.topK !== undefined) draft.topK = source.topK;
-  if (source.topP !== undefined) draft.topP = source.topP;
-  if (source.verbosity !== undefined) draft.verbosity = source.verbosity;
-  if (source.parallelToolCalling !== undefined)
-    draft.parallelToolCalling = source.parallelToolCalling;
-  if (source.frequencyPenalty !== undefined)
-    draft.frequencyPenalty = source.frequencyPenalty;
-  if (source.presencePenalty !== undefined)
-    draft.presencePenalty = source.presencePenalty;
-  if (source.thinking !== undefined) draft.thinking = { ...source.thinking };
-  if (source.interleavedThinking !== undefined)
-    draft.interleavedThinking = source.interleavedThinking;
-  if (source.webSearch !== undefined) draft.webSearch = { ...source.webSearch };
-  if (source.memoryTool !== undefined) draft.memoryTool = source.memoryTool;
-  if (source.extraHeaders !== undefined)
-    draft.extraHeaders = { ...source.extraHeaders };
-  if (source.extraBody !== undefined) draft.extraBody = { ...source.extraBody };
+  mergePartialByKeys(draft, source, MODEL_CONFIG_KEYS);
 }
 
 /**
@@ -242,13 +217,7 @@ export function duplicateModel(
   existingModels: ModelConfig[],
 ): ModelConfig {
   const newId = generateAutoVersionedId(model.id, existingModels);
-  return {
-    ...model,
-    id: newId,
-    capabilities: model.capabilities ? { ...model.capabilities } : undefined,
-    thinking: model.thinking ? { ...model.thinking } : undefined,
-    webSearch: model.webSearch ? { ...model.webSearch } : undefined,
-    extraHeaders: model.extraHeaders ? { ...model.extraHeaders } : undefined,
-    extraBody: model.extraBody ? { ...model.extraBody } : undefined,
-  };
+  const cloned = deepClone(model);
+  cloned.id = newId;
+  return cloned;
 }

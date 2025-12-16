@@ -311,6 +311,72 @@
                             }
                           ]
                         },
+                        "interleavedThinking": {
+                          "type": "boolean",
+                          "description": "Enable interleaved thinking for tool use."
+                        },
+                        "webSearch": {
+                          "type": "object",
+                          "description": "Use native web search tool.",
+                          "properties": {
+                            "enabled": {
+                              "type": "boolean",
+                              "description": "Whether web search is enabled."
+                            },
+                            "maxUses": {
+                              "type": "integer",
+                              "description": "Maximum number of web searches per request."
+                            },
+                            "allowedDomains": {
+                              "type": "array",
+                              "description": "Only include results from these domains.",
+                              "items": {
+                                "type": "string"
+                              }
+                            },
+                            "blockedDomains": {
+                              "type": "array",
+                              "description": "Never include results from these domains.",
+                              "items": {
+                                "type": "string"
+                              }
+                            },
+                            "userLocation": {
+                              "type": "object",
+                              "description": "User location for localizing search results.",
+                              "properties": {
+                                "type": {
+                                  "type": "string",
+                                  "const": "approximate",
+                                  "description": "Approximate location."
+                                },
+                                "city": {
+                                  "type": "string",
+                                  "description": "City."
+                                },
+                                "region": {
+                                  "type": "string",
+                                  "description": "Region."
+                                },
+                                "country": {
+                                  "type": "string",
+                                  "description": "Country."
+                                },
+                                "timezone": {
+                                  "type": "string",
+                                  "description": "Timezone."
+                                }
+                              },
+                              "required": [
+                                "type"
+                              ]
+                            }
+                          }
+                        },
+                        "memoryTool": {
+                          "type": "boolean",
+                          "description": "Use native memory tool."
+                        },
                         "extraHeaders": {
                           "type": "object",
                           "description": "Extra headers to include in requests.",

@@ -1,10 +1,12 @@
 import * as vscode from 'vscode';
-import { normalizeBaseUrlInput } from './utils';
 import {
-  ProviderConfig,
-  ModelConfig,
-  ModelCapabilities,
-} from './client/interface';
+  mergePartialFromRecordByKeys,
+  MODEL_CONFIG_KEYS,
+  PROVIDER_CONFIG_KEYS,
+  withoutKeys,
+} from './config-ops';
+import { normalizeBaseUrlInput } from './utils';
+import { ProviderConfig, ModelConfig } from './client/interface';
 import { Mimic, PROVIDER_TYPES, PROVIDERS, ProviderType } from './client';
 
 const CONFIG_NAMESPACE = 'unifyChatProvider';
@@ -69,7 +71,7 @@ export class ConfigStore {
    * Normalize raw configuration to ProviderConfig
    */
   private normalizeProviderConfig(raw: unknown): ProviderConfig | null {
-    if (!raw || typeof raw !== 'object') {
+    if (!raw || typeof raw !== 'object' || Array.isArray(raw)) {
       return null;
     }
 
@@ -104,30 +106,63 @@ export class ConfigStore {
     }
     const type = obj.type as ProviderType;
 
-    // Validate mimic option (optional, defaults to undefined)
-    const supportMimics = PROVIDERS[type].supportMimics;
-    const rawMimic = obj.mimic;
-    const mimic: Mimic | undefined =
-      typeof rawMimic === 'string' && supportMimics.includes(rawMimic as Mimic)
-        ? (rawMimic as Mimic)
-        : undefined;
-
-    return {
-      type: type as ProviderType,
+    const provider: ProviderConfig = {
+      type,
       name: obj.name,
       baseUrl,
-      apiKey: typeof obj.apiKey === 'string' ? obj.apiKey : undefined,
       models,
-      mimic,
-      extraHeaders:
-        obj.extraHeaders && typeof obj.extraHeaders === 'object'
-          ? (obj.extraHeaders as Record<string, string>)
-          : undefined,
-      extraBody:
-        obj.extraBody && typeof obj.extraBody === 'object'
-          ? (obj.extraBody as Record<string, unknown>)
-          : undefined,
     };
+
+    mergePartialFromRecordByKeys(
+      provider,
+      obj,
+      withoutKeys(
+        PROVIDER_CONFIG_KEYS,
+        ['type', 'name', 'baseUrl', 'models'] as const,
+      ),
+    );
+
+    const supportMimics = PROVIDERS[type].supportMimics;
+    provider.apiKey = typeof provider.apiKey === 'string' ? provider.apiKey : undefined;
+    provider.mimic = this.isSupportedMimic(provider.mimic, supportMimics)
+      ? provider.mimic
+      : undefined;
+
+    provider.extraHeaders = this.normalizeStringRecord(provider.extraHeaders);
+    provider.extraBody = this.normalizeObjectRecord(provider.extraBody);
+
+    return provider;
+  }
+
+  private isSupportedMimic(raw: unknown, supported: readonly Mimic[]): raw is Mimic {
+    return typeof raw === 'string' && supported.some((m) => m === raw);
+  }
+
+  private normalizeObjectRecord(
+    raw: unknown,
+  ): Record<string, unknown> | undefined {
+    return raw && typeof raw === 'object' && !Array.isArray(raw)
+      ? (raw as Record<string, unknown>)
+      : undefined;
+  }
+
+  private normalizeStringRecord(
+    raw: unknown,
+  ): Record<string, string> | undefined {
+    if (!raw || typeof raw !== 'object' || Array.isArray(raw)) {
+      return undefined;
+    }
+    const record = raw as Record<string, unknown>;
+    const out: Record<string, string> = {};
+
+    for (const [key, value] of Object.entries(record)) {
+      if (typeof value !== 'string') {
+        return undefined;
+      }
+      out[key] = value;
+    }
+
+    return out;
   }
 
   /**
@@ -138,103 +173,21 @@ export class ConfigStore {
       return { id: raw };
     }
 
-    if (raw && typeof raw === 'object') {
+    if (raw && typeof raw === 'object' && !Array.isArray(raw)) {
       const obj = raw as Record<string, unknown>;
       if (typeof obj.id === 'string' && obj.id) {
-        let capabilities: ModelCapabilities | undefined;
-        if (obj.capabilities && typeof obj.capabilities === 'object') {
-          const caps = obj.capabilities as Record<string, unknown>;
-          capabilities = {
-            toolCalling:
-              typeof caps.toolCalling === 'boolean' ||
-              typeof caps.toolCalling === 'number'
-                ? caps.toolCalling
-                : undefined,
-            imageInput:
-              typeof caps.imageInput === 'boolean'
-                ? caps.imageInput
-                : undefined,
-          };
-        }
+        const model: ModelConfig = { id: obj.id };
 
-        return {
-          id: obj.id,
-          name: typeof obj.name === 'string' ? obj.name : undefined,
-          family: typeof obj.family === 'string' ? obj.family : undefined,
-          maxInputTokens:
-            typeof obj.maxInputTokens === 'number'
-              ? obj.maxInputTokens
-              : undefined,
-          maxOutputTokens:
-            typeof obj.maxOutputTokens === 'number'
-              ? obj.maxOutputTokens
-              : undefined,
-          capabilities,
-          stream: typeof obj.stream === 'boolean' ? obj.stream : undefined,
-          temperature:
-            typeof obj.temperature === 'number' ? obj.temperature : undefined,
-          topK: typeof obj.topK === 'number' ? obj.topK : undefined,
-          topP: typeof obj.topP === 'number' ? obj.topP : undefined,
-          frequencyPenalty:
-            typeof obj.frequencyPenalty === 'number'
-              ? obj.frequencyPenalty
-              : undefined,
-          presencePenalty:
-            typeof obj.presencePenalty === 'number'
-              ? obj.presencePenalty
-              : undefined,
-          verbosity:
-            obj.verbosity === 'low' ||
-            obj.verbosity === 'medium' ||
-            obj.verbosity === 'high'
-              ? obj.verbosity
-              : undefined,
-          parallelToolCalling:
-            typeof obj.parallelToolCalling === 'boolean'
-              ? obj.parallelToolCalling
-              : undefined,
-          thinking:
-            obj.thinking && typeof obj.thinking === 'object'
-              ? (() => {
-                  const thinking = obj.thinking as Record<string, unknown>;
-                  const effort =
-                    thinking.effort === 'none' ||
-                    thinking.effort === 'minimal' ||
-                    thinking.effort === 'low' ||
-                    thinking.effort === 'medium' ||
-                    thinking.effort === 'high' ||
-                    thinking.effort === 'xhigh'
-                      ? thinking.effort
-                      : undefined;
+        mergePartialFromRecordByKeys(
+          model,
+          obj,
+          withoutKeys(MODEL_CONFIG_KEYS, ['id'] as const),
+        );
 
-                  const type =
-                    thinking.type === 'enabled' || thinking.type === 'disabled'
-                      ? thinking.type
-                      : undefined;
+        model.extraHeaders = this.normalizeStringRecord(model.extraHeaders);
+        model.extraBody = this.normalizeObjectRecord(model.extraBody);
 
-                  if (!type) {
-                    return undefined;
-                  }
-
-                  return {
-                    type,
-                    budgetTokens:
-                      typeof thinking.budgetTokens === 'number'
-                        ? thinking.budgetTokens
-                        : undefined,
-                    effort,
-                  };
-                })()
-              : undefined,
-          extraHeaders:
-            obj.extraHeaders && typeof obj.extraHeaders === 'object'
-              ? (obj.extraHeaders as Record<string, string>)
-              : undefined,
-          extraBody:
-            obj.extraBody && typeof obj.extraBody === 'object'
-              ? (obj.extraBody as Record<string, unknown>)
-              : undefined,
-        };
+        return model;
       }
     }
 

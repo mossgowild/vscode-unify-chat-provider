@@ -2,6 +2,11 @@ import * as vscode from 'vscode';
 import { ConfigStore } from '../config-store';
 import type { ProviderConfig } from '../client/interface';
 import {
+  deepClone,
+  mergePartialByKeys,
+  PROVIDER_CONFIG_KEYS,
+} from '../config-ops';
+import {
   confirmDelete,
   confirmRemove,
   pickQuickItem,
@@ -331,15 +336,16 @@ async function saveProviderDraft(
 function buildProviderConfigFromDraft(
   draft: ProviderFormDraft,
 ): Partial<ProviderConfig> {
+  const source: Partial<ProviderConfig> = {
+    ...deepClone(draft),
+    name: draft.name?.trim() || undefined,
+    baseUrl: draft.baseUrl?.trim() || undefined,
+    apiKey: draft.apiKey?.trim() || undefined,
+    models: draft.models.length > 0 ? deepClone(draft.models) : undefined,
+  };
+
   const config: Partial<ProviderConfig> = {};
-  if (draft.type) config.type = draft.type;
-  if (draft.name) config.name = draft.name;
-  if (draft.baseUrl) config.baseUrl = draft.baseUrl;
-  if (draft.apiKey) config.apiKey = draft.apiKey;
-  if (draft.mimic) config.mimic = draft.mimic;
-  if (draft.models.length > 0) config.models = [...draft.models];
-  if (draft.extraHeaders) config.extraHeaders = { ...draft.extraHeaders };
-  if (draft.extraBody) config.extraBody = { ...draft.extraBody };
+  mergePartialByKeys(config, source, PROVIDER_CONFIG_KEYS);
   return config;
 }
 
@@ -361,15 +367,8 @@ async function duplicateProvider(
   }
 
   // Create the duplicated provider
-  const duplicated: ProviderConfig = {
-    ...provider,
-    name: newName,
-    models: provider.models.map((m) => ({ ...m })),
-    extraHeaders: provider.extraHeaders
-      ? { ...provider.extraHeaders }
-      : undefined,
-    extraBody: provider.extraBody ? { ...provider.extraBody } : undefined,
-  };
+  const duplicated = deepClone(provider);
+  duplicated.name = newName;
 
   await store.upsertProvider(duplicated);
   vscode.window.showInformationMessage(`Provider duplicated as "${newName}".`);

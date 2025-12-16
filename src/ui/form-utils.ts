@@ -2,21 +2,21 @@ import * as vscode from 'vscode';
 import { PROVIDERS } from '../client';
 import type { ModelConfig, ProviderConfig } from '../client/interface';
 import { ConfigStore } from '../config-store';
+import {
+  deepClone,
+  modelConfigEquals,
+  stableStringify,
+  toComparableModelConfig,
+  toComparableProviderConfig,
+} from '../config-ops';
 import { normalizeBaseUrlInput } from '../utils';
 import { showValidationErrors } from './component';
 
 /**
  * Draft type for provider form editing.
  */
-export type ProviderFormDraft = {
-  type?: ProviderConfig['type'];
-  name?: string;
-  baseUrl?: string;
-  apiKey?: string;
-  mimic?: ProviderConfig['mimic'];
+export type ProviderFormDraft = Omit<Partial<ProviderConfig>, 'models'> & {
   models: ModelConfig[];
-  extraHeaders?: Record<string, string>;
-  extraBody?: Record<string, unknown>;
 };
 
 /**
@@ -25,45 +25,14 @@ export type ProviderFormDraft = {
 export function createProviderDraft(
   existing?: ProviderConfig,
 ): ProviderFormDraft {
-  if (!existing) {
-    return { models: [] };
-  }
-  return {
-    ...existing,
-    models: cloneModels(existing.models),
-    extraHeaders: existing.extraHeaders
-      ? { ...existing.extraHeaders }
-      : undefined,
-    extraBody: existing.extraBody ? { ...existing.extraBody } : undefined,
-  };
+  return existing ? deepClone(existing) : { models: [] };
 }
 
 /**
  * Deep clone an array of model configs.
  */
 export function cloneModels(models: ModelConfig[]): ModelConfig[] {
-  return models.map((m) => ({
-    id: m.id,
-    name: m.name,
-    family: m.family,
-    maxInputTokens: m.maxInputTokens,
-    maxOutputTokens: m.maxOutputTokens,
-    capabilities: m.capabilities ? { ...m.capabilities } : undefined,
-    stream: m.stream,
-    temperature: m.temperature,
-    topK: m.topK,
-    topP: m.topP,
-    verbosity: m.verbosity,
-    parallelToolCalling: m.parallelToolCalling,
-    frequencyPenalty: m.frequencyPenalty,
-    presencePenalty: m.presencePenalty,
-    thinking: m.thinking ? { ...m.thinking } : undefined,
-    interleavedThinking: m.interleavedThinking,
-    webSearch: m.webSearch ? { ...m.webSearch } : undefined,
-    memoryTool: m.memoryTool,
-    extraHeaders: m.extraHeaders ? { ...m.extraHeaders } : undefined,
-    extraBody: m.extraBody ? { ...m.extraBody } : undefined,
-  }));
+  return deepClone(models);
 }
 
 /**
@@ -91,14 +60,11 @@ export function normalizeProviderDraft(
   draft: ProviderFormDraft,
 ): ProviderConfig {
   return {
+    ...deepClone(draft),
     type: draft.type!,
     name: draft.name!.trim(),
     baseUrl: normalizeBaseUrlInput(draft.baseUrl!),
     apiKey: draft.apiKey?.trim() || undefined,
-    mimic: draft.mimic,
-    models: cloneModels(draft.models),
-    extraHeaders: draft.extraHeaders,
-    extraBody: draft.extraBody,
   };
 }
 
@@ -106,28 +72,11 @@ export function normalizeProviderDraft(
  * Normalize a model draft.
  */
 export function normalizeModelDraft(draft: ModelConfig): ModelConfig {
-  return {
-    id: draft.id.trim(),
-    name: draft.name?.trim() || undefined,
-    family: draft.family?.trim() || undefined,
-    maxInputTokens: draft.maxInputTokens,
-    maxOutputTokens: draft.maxOutputTokens,
-    capabilities: draft.capabilities ? { ...draft.capabilities } : undefined,
-    stream: draft.stream,
-    temperature: draft.temperature,
-    topK: draft.topK,
-    topP: draft.topP,
-    verbosity: draft.verbosity,
-    parallelToolCalling: draft.parallelToolCalling,
-    frequencyPenalty: draft.frequencyPenalty,
-    presencePenalty: draft.presencePenalty,
-    thinking: draft.thinking ? { ...draft.thinking } : undefined,
-    interleavedThinking: draft.interleavedThinking,
-    webSearch: draft.webSearch ? { ...draft.webSearch } : undefined,
-    memoryTool: draft.memoryTool,
-    extraHeaders: draft.extraHeaders ? { ...draft.extraHeaders } : undefined,
-    extraBody: draft.extraBody ? { ...draft.extraBody } : undefined,
-  };
+  const normalized = deepClone(draft);
+  normalized.id = normalized.id.trim();
+  normalized.name = normalized.name?.trim() || undefined;
+  normalized.family = normalized.family?.trim() || undefined;
+  return normalized;
 }
 
 /**
@@ -137,13 +86,18 @@ export function thinkingEqual(
   a?: ModelConfig['thinking'],
   b?: ModelConfig['thinking'],
 ): boolean {
-  if (a === b) return true;
-  if (!a || !b) return false;
-  return (
-    a.type === b.type &&
-    a.budgetTokens === b.budgetTokens &&
-    a.effort === b.effort
-  );
+  return stableStringify(a) === stableStringify(b);
+}
+
+function toComparableProviderDraft(draft: ProviderFormDraft): unknown {
+  const cloned = deepClone(draft);
+  return {
+    ...cloned,
+    name: cloned.name?.trim() ?? '',
+    baseUrl: cloned.baseUrl?.trim() ?? '',
+    apiKey: cloned.apiKey?.trim() ?? '',
+    models: cloned.models.map(toComparableModelConfig),
+  };
 }
 
 /**
@@ -153,33 +107,12 @@ export function hasProviderChanges(
   draft: ProviderFormDraft,
   original?: ProviderConfig,
 ): boolean {
-  const trimmedName = draft.name?.trim();
-  const trimmedBaseUrl = draft.baseUrl?.trim();
-  const trimmedApiKey = draft.apiKey?.trim();
-
-  if (!original) {
-    return (
-      !!draft.type ||
-      !!trimmedName ||
-      !!trimmedBaseUrl ||
-      !!trimmedApiKey ||
-      !!draft.mimic ||
-      draft.models.length > 0
-    );
-  }
-
-  if (draft.type !== original.type) return true;
-  if ((trimmedName ?? '') !== original.name) return true;
-  if ((trimmedBaseUrl ?? '') !== original.baseUrl) return true;
-  if ((trimmedApiKey ?? '') !== (original.apiKey ?? '')) return true;
-  if (draft.mimic !== original.mimic) return true;
-  if (
-    JSON.stringify(draft.extraHeaders) !== JSON.stringify(original.extraHeaders)
-  )
-    return true;
-  if (JSON.stringify(draft.extraBody) !== JSON.stringify(original.extraBody))
-    return true;
-  return modelsChanged(draft.models, original.models);
+  const baseline: ProviderFormDraft = { models: [] };
+  return original
+    ? stableStringify(toComparableProviderDraft(draft)) !==
+        stableStringify(toComparableProviderConfig(original))
+    : stableStringify(toComparableProviderDraft(draft)) !==
+        stableStringify(toComparableProviderDraft(baseline));
 }
 
 /**
@@ -189,75 +122,10 @@ export function hasModelChanges(
   draft: ModelConfig,
   original?: ModelConfig,
 ): boolean {
-  const trimmedId = draft.id.trim();
-  const trimmedName = draft.name?.trim() ?? '';
-  const inputTokens = draft.maxInputTokens ?? null;
-  const outputTokens = draft.maxOutputTokens ?? null;
-  const toolCalling = draft.capabilities?.toolCalling ?? false;
-  const imageInput = draft.capabilities?.imageInput ?? false;
-
-  const stream = draft.stream;
-  const temperature = draft.temperature;
-  const topK = draft.topK;
-  const topP = draft.topP;
-  const verbosity = draft.verbosity;
-  const parallelToolCalling = draft.parallelToolCalling;
-  const frequencyPenalty = draft.frequencyPenalty;
-  const presencePenalty = draft.presencePenalty;
-  const thinking = draft.thinking;
-  const interleavedThinking = draft.interleavedThinking;
-  const webSearch = draft.webSearch;
-  const memoryTool = draft.memoryTool;
-  const extraHeaders = draft.extraHeaders;
-  const extraBody = draft.extraBody;
-
-  if (!original) {
-    return (
-      !!trimmedId ||
-      !!trimmedName ||
-      inputTokens !== null ||
-      outputTokens !== null ||
-      !!toolCalling ||
-      imageInput ||
-      stream !== undefined ||
-      temperature !== undefined ||
-      topK !== undefined ||
-      topP !== undefined ||
-      verbosity !== undefined ||
-      parallelToolCalling !== undefined ||
-      frequencyPenalty !== undefined ||
-      presencePenalty !== undefined ||
-      thinking !== undefined ||
-      interleavedThinking !== undefined ||
-      webSearch !== undefined ||
-      memoryTool !== undefined ||
-      extraHeaders !== undefined ||
-      extraBody !== undefined
-    );
-  }
-
-  return (
-    trimmedId !== original.id ||
-    trimmedName !== (original.name ?? '') ||
-    inputTokens !== (original.maxInputTokens ?? null) ||
-    outputTokens !== (original.maxOutputTokens ?? null) ||
-    toolCalling !== (original.capabilities?.toolCalling ?? false) ||
-    imageInput !== (original.capabilities?.imageInput ?? false) ||
-    stream !== original.stream ||
-    temperature !== original.temperature ||
-    topK !== original.topK ||
-    topP !== original.topP ||
-    verbosity !== original.verbosity ||
-    parallelToolCalling !== original.parallelToolCalling ||
-    frequencyPenalty !== original.frequencyPenalty ||
-    presencePenalty !== original.presencePenalty ||
-    !thinkingEqual(thinking, original.thinking) ||
-    interleavedThinking !== original.interleavedThinking ||
-    JSON.stringify(webSearch) !== JSON.stringify(original.webSearch) ||
-    memoryTool !== original.memoryTool ||
-    JSON.stringify(extraHeaders) !== JSON.stringify(original.extraHeaders) ||
-    JSON.stringify(extraBody) !== JSON.stringify(original.extraBody)
-  );
+  const baseline: ModelConfig = { id: '' };
+  return original
+    ? !modelConfigEquals(draft, original)
+    : !modelConfigEquals(draft, baseline);
 }
 
 /**
@@ -275,30 +143,7 @@ export function modelsChanged(
  * Check if two model configs are equal.
  */
 export function modelsEqual(a: ModelConfig, b: ModelConfig): boolean {
-  return (
-    a.id === b.id &&
-    (a.name ?? '') === (b.name ?? '') &&
-    (a.maxInputTokens ?? null) === (b.maxInputTokens ?? null) &&
-    (a.maxOutputTokens ?? null) === (b.maxOutputTokens ?? null) &&
-    (a.capabilities?.toolCalling ?? false) ===
-      (b.capabilities?.toolCalling ?? false) &&
-    (a.capabilities?.imageInput ?? false) ===
-      (b.capabilities?.imageInput ?? false) &&
-    a.stream === b.stream &&
-    a.temperature === b.temperature &&
-    a.topK === b.topK &&
-    a.topP === b.topP &&
-    a.verbosity === b.verbosity &&
-    a.parallelToolCalling === b.parallelToolCalling &&
-    a.frequencyPenalty === b.frequencyPenalty &&
-    a.presencePenalty === b.presencePenalty &&
-    thinkingEqual(a.thinking, b.thinking) &&
-    a.interleavedThinking === b.interleavedThinking &&
-    JSON.stringify(a.webSearch) === JSON.stringify(b.webSearch) &&
-    a.memoryTool === b.memoryTool &&
-    JSON.stringify(a.extraHeaders) === JSON.stringify(b.extraHeaders) &&
-    JSON.stringify(a.extraBody) === JSON.stringify(b.extraBody)
-  );
+  return modelConfigEquals(a, b);
 }
 
 /**
