@@ -158,7 +158,7 @@ export async function removeProvider(store: ConfigStore): Promise<void> {
 function buildProviderListItems(store: ConfigStore): ProviderListItem[] {
   const items: ProviderListItem[] = [
     {
-      label: '$(add) Add New Provider...',
+      label: '$(add) Add Provider...',
       action: 'add',
       alwaysShow: true,
     },

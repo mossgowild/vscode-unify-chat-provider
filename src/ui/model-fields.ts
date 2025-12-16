@@ -524,15 +524,18 @@ export const modelFormSchema: FormSchema<ModelConfig> = {
       icon: 'json',
       section: 'others',
       edit: async () => {
-        const choice = await vscode.window.showInformationMessage(
-          'Extra headers must be configured in VS Code settings (JSON).',
-          'Open Settings',
-        );
-        if (choice === 'Open Settings') {
-          await vscode.commands.executeCommand(
-            'workbench.action.openSettingsJson',
-          );
-        }
+        vscode.window
+          .showInformationMessage(
+            'Extra headers must be configured in VS Code settings (JSON).',
+            'Open Settings',
+          )
+          .then((choice) => {
+            if (choice === 'Open Settings') {
+              vscode.commands.executeCommand(
+                'workbench.action.openSettingsJson',
+              );
+            }
+          });
       },
       getDescription: (draft) =>
         draft.extraHeaders
@@ -547,15 +550,18 @@ export const modelFormSchema: FormSchema<ModelConfig> = {
       icon: 'json',
       section: 'others',
       edit: async () => {
-        const choice = await vscode.window.showInformationMessage(
-          'Extra body parameters must be configured in VS Code settings (JSON).',
-          'Open Settings',
-        );
-        if (choice === 'Open Settings') {
-          await vscode.commands.executeCommand(
-            'workbench.action.openSettingsJson',
-          );
-        }
+        vscode.window
+          .showInformationMessage(
+            'Extra body parameters must be configured in VS Code settings (JSON).',
+            'Open Settings',
+          )
+          .then((choice) => {
+            if (choice === 'Open Settings') {
+              vscode.commands.executeCommand(
+                'workbench.action.openSettingsJson',
+              );
+            }
+          });
       },
       getDescription: (draft) =>
         draft.extraBody
