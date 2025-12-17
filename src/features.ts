@@ -1,4 +1,4 @@
-import { ModelConfig } from './client/interface';
+import { ModelConfig, ProviderConfig } from './client/interface';
 import { getBaseModelId } from './model-id-utils';
 
 export enum FeatureId {
@@ -39,6 +39,22 @@ export interface Feature {
    * Supported model IDs, use {@link Array.includes} to check if a model is supported.
    */
   supportedModels?: string[];
+
+  /**
+   * Supported provider URL patterns.
+   * Can be strings with wildcards (*) or RegExp objects.
+   * Examples:
+   * - "https://api.anthropic.com" - exact match
+   * - "https://*.openai.com" - wildcard match
+   * - /^https:\/\/.*\.azure\.com/ - regex match
+   */
+  supportedProviders?: ProviderPattern[];
+
+  /**
+   * Custom checker functions for feature support.
+   * If any checker returns true, the feature is considered supported.
+   */
+  customCheckers?: FeatureChecker[];
 }
 
 export const FEATURES: Record<FeatureId, Feature> = {
@@ -134,12 +150,50 @@ export const FEATURES: Record<FeatureId, Feature> = {
 };
 
 /**
- * Check if a feature is supported by a specific model.
+ * Pattern for matching provider URLs.
+ * Can be a string with wildcards (*) or a RegExp.
+ */
+export type ProviderPattern = string | RegExp;
+
+/**
+ * Custom checker function for feature support.
+ * Returns true if the feature should be enabled.
+ */
+export type FeatureChecker = (
+  model: ModelConfig,
+  provider: ProviderConfig,
+) => boolean;
+
+/**
+ * Match a URL against a provider pattern.
+ * @param url The URL to match
+ * @param pattern The pattern to match against (string with wildcards or RegExp)
+ * @returns true if the URL matches the pattern
+ */
+function matchProviderPattern(url: string, pattern: ProviderPattern): boolean {
+  if (pattern instanceof RegExp) {
+    return pattern.test(url);
+  }
+
+  // Convert wildcard string to regex
+  // Escape special regex characters except *
+  const escaped = pattern.replace(/[.+?^${}()|[\]\\]/g, '\\$&');
+  // Convert * to regex pattern (match any characters)
+  const regexStr = `^${escaped.replace(/\*/g, '.*')}$`;
+  const regex = new RegExp(regexStr);
+  return regex.test(url);
+}
+
+/**
+ * Check if a feature is supported by a specific model and provider.
  * @param featureId The feature ID to check
- * @returns true if the feature is supported by the model
+ * @param model The model configuration
+ * @param provider The provider configuration
+ * @returns true if the feature is supported
  */
 export function isFeatureSupported(
   featureId: FeatureId,
+  provider: ProviderConfig,
   model: ModelConfig,
 ): boolean {
   const feature = FEATURES[featureId];
@@ -147,11 +201,27 @@ export function isFeatureSupported(
     return false;
   }
 
+  // Check custom checkers first - if any returns true, feature is supported
+  if (feature.customCheckers?.some((checker) => checker(model, provider))) {
+    return true;
+  }
+
+  // Check supported providers
+  if (
+    feature.supportedProviders?.some((pattern) =>
+      matchProviderPattern(provider.baseUrl, pattern),
+    )
+  ) {
+    return true;
+  }
+
+  // Check supported models
   const baseId = getBaseModelId(model.id);
   if (baseId && feature.supportedModels?.some((v) => baseId.includes(v))) {
     return true;
   }
 
+  // Check supported families
   const family = model.family ?? baseId;
   if (family && feature.supportedFamilys?.some((v) => family.includes(v))) {
     return true;

@@ -75,10 +75,6 @@ export interface ModelConfig {
     effort?: 'none' | 'minimal' | 'low' | 'medium' | 'high' | 'xhigh';
   };
   /**
-   * Enable interleaved thinking for tool use.
-   */
-  interleavedThinking?: boolean;
-  /**
    * Use native web search tool.
    */
   webSearch?: {

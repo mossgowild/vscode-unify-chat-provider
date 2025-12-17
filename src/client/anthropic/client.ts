@@ -445,10 +445,12 @@ export class AnthropicProvider implements ApiProvider {
     const memoryToolEnabled = model.memoryTool === true;
     const memoryToolSupported = isFeatureSupported(
       FeatureId.AnthropicMemoryTool,
+      this.config,
       model,
     );
     const webSearchSupported = isFeatureSupported(
       FeatureId.AnthropicWebSearch,
+      this.config,
       model,
     );
 
@@ -581,7 +583,7 @@ export class AnthropicProvider implements ApiProvider {
   private normalizeThinkingBudget(
     configValue: number | undefined,
     maxOutputTokens: number,
-    interleavedThinkingEnabled: boolean,
+    anthropicInterleavedThinkingEnabled: boolean,
   ): number {
     if (configValue === undefined) {
       configValue = 0;
@@ -591,7 +593,7 @@ export class AnthropicProvider implements ApiProvider {
     const normalizedBudget = configValue < 1024 ? 1024 : configValue;
 
     // Calculate safe value: min of (maxOutputTokens - 1, normalizedBudget)
-    return interleavedThinkingEnabled
+    return anthropicInterleavedThinkingEnabled
       ? normalizedBudget
       : Math.min(maxOutputTokens - 1, normalizedBudget);
   }
@@ -615,15 +617,15 @@ export class AnthropicProvider implements ApiProvider {
 
     const thinkingEnabled = model.thinking?.type === 'enabled';
     const hasTools = (options.tools && options.tools.length > 0) ?? false;
-    const interleavedThinkingSupported = isFeatureSupported(
-      FeatureId.AnthropicInterleavedThinking,
-      model,
-    );
-    const interleavedThinkingEnabled =
+
+    const anthropicInterleavedThinkingEnabled =
       thinkingEnabled &&
-      model.interleavedThinking === true &&
       hasTools &&
-      interleavedThinkingSupported;
+      isFeatureSupported(
+        FeatureId.AnthropicInterleavedThinking,
+        this.config,
+        model,
+      );
 
     const { system, messages: anthropicMessages } = this.convertMessages(
       encodedModelId,
@@ -644,7 +646,7 @@ export class AnthropicProvider implements ApiProvider {
     // Build betas array for beta API features
     const betaFeatures = new Set<string>();
 
-    if (interleavedThinkingEnabled) {
+    if (anthropicInterleavedThinkingEnabled) {
       betaFeatures.add('interleaved-thinking-2025-05-14');
     }
 
@@ -718,7 +720,7 @@ export class AnthropicProvider implements ApiProvider {
             budget_tokens: this.normalizeThinkingBudget(
               budgetTokens,
               requestBase.max_tokens,
-              interleavedThinkingEnabled,
+              anthropicInterleavedThinkingEnabled,
             ),
           };
         }

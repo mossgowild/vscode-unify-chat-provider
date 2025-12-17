@@ -502,6 +502,7 @@ export class OpenAIChatCompletionProvider implements ApiProvider {
 
     const shouldApplyCacheControl = isFeatureSupported(
       FeatureId.OpenAICacheControl,
+      this.config,
       model,
     );
 
@@ -527,7 +528,11 @@ export class OpenAIChatCompletionProvider implements ApiProvider {
         : {}),
       ...this.buildReasoningParams(model),
       ...(model.maxOutputTokens !== undefined
-        ? isFeatureSupported(FeatureId.OpenAIOnlyUseMaxCompletionTokens, model)
+        ? isFeatureSupported(
+            FeatureId.OpenAIOnlyUseMaxCompletionTokens,
+            this.config,
+            model,
+          )
           ? { max_completion_tokens: model.maxOutputTokens }
           : {
               max_tokens: model.maxOutputTokens,

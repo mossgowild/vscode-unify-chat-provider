@@ -16,7 +16,6 @@ export const MODEL_CONFIG_KEYS = [
   'parallelToolCalling',
   'verbosity',
   'thinking',
-  'interleavedThinking',
   'webSearch',
   'memoryTool',
   'extraHeaders',

@@ -23,7 +23,6 @@ export const WELL_KNOWN_MODELS: WellKnownModelConfig[] = [
       type: 'enabled',
       budgetTokens: 16000,
     },
-    interleavedThinking: true,
     capabilities: {
       toolCalling: true,
       imageInput: true,
@@ -52,7 +51,6 @@ export const WELL_KNOWN_MODELS: WellKnownModelConfig[] = [
       type: 'enabled',
       budgetTokens: 32000,
     },
-    interleavedThinking: true,
     capabilities: {
       toolCalling: true,
       imageInput: true,
@@ -69,7 +67,6 @@ export const WELL_KNOWN_MODELS: WellKnownModelConfig[] = [
       type: 'enabled',
       budgetTokens: 10000,
     },
-    interleavedThinking: true,
     capabilities: {
       toolCalling: true,
       imageInput: true,
@@ -85,7 +82,6 @@ export const WELL_KNOWN_MODELS: WellKnownModelConfig[] = [
       type: 'enabled',
       budgetTokens: 10000,
     },
-    interleavedThinking: true,
     capabilities: {
       toolCalling: true,
       imageInput: true,
@@ -117,7 +113,6 @@ export const WELL_KNOWN_MODELS: WellKnownModelConfig[] = [
       type: 'enabled',
       budgetTokens: 10000,
     },
-    interleavedThinking: true,
     capabilities: {
       toolCalling: true,
       imageInput: true,

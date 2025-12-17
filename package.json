@@ -311,10 +311,6 @@
                             }
                           ]
                         },
-                        "interleavedThinking": {
-                          "type": "boolean",
-                          "description": "Enable interleaved thinking for tool use."
-                        },
                         "webSearch": {
                           "type": "object",
                           "description": "Use native web search tool.",
