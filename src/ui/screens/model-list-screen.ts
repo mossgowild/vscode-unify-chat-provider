@@ -242,14 +242,7 @@ export async function runModelListScreen(
   }
 
   if (selection.action === 'add-from-wellknown') {
-    if (!route.draft?.type) {
-      vscode.window.showErrorMessage(
-        'Please select an API format before using the well-known model list.',
-      );
-      return { kind: 'stay' };
-    }
-
-    return {
+        return {
       kind: 'push',
       route: {
         kind: 'modelSelection',
