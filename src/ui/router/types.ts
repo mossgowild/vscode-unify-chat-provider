@@ -38,6 +38,7 @@ export interface WellKnownProviderApiKeyRoute {
 
 export interface ModelListRoute {
   kind: 'modelList';
+  invocation: 'addProvider' | 'addFromWellKnownProvider' | 'providerEdit';
   models: ModelConfig[];
   providerLabel: string;
   requireAtLeastOne?: boolean;

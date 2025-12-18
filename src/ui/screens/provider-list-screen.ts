@@ -101,6 +101,7 @@ export async function runProviderListScreen(
       kind: 'push',
       route: {
         kind: 'modelList',
+        invocation: 'providerEdit',
         models: draft.models,
         providerLabel: existing.name,
         requireAtLeastOne: false,

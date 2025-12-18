@@ -31,6 +31,7 @@ export async function runWellKnownProviderApiKeyScreen(
     kind: 'push',
     route: {
       kind: 'modelList',
+      invocation: 'addFromWellKnownProvider',
       models: route.draft.models,
       providerLabel: route.draft.name ?? route.provider.name,
       requireAtLeastOne: false,

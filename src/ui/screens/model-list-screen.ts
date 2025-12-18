@@ -53,9 +53,10 @@ export async function runModelListScreen(
   const mustKeepOne = route.requireAtLeastOne ?? false;
   const includeSave = typeof route.onSave === 'function';
   const providerName = route.draft?.name ?? route.providerLabel;
-  const title = includeSave
-    ? `Provider: ${providerName}`
-    : `Models (${providerName})`;
+  const title =
+    route.invocation === 'providerEdit'
+      ? `Provider: ${providerName}`
+      : `Models (${providerName})`;
   let didSave = false;
 
   const selection = await pickQuickItem<ModelListItem>({
@@ -358,7 +359,12 @@ function buildModelListItems(
     }
   }
 
-  if (route.draft && typeof route.onSave === 'function') {
+  if (
+    (route.invocation === 'addFromWellKnownProvider' ||
+      route.invocation === 'providerEdit') &&
+    route.draft &&
+    typeof route.onSave === 'function'
+  ) {
     items.push({ label: '', kind: vscode.QuickPickItemKind.Separator });
     items.push({
       label: '$(gear) Provider Settings...',

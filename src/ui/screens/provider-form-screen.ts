@@ -130,6 +130,7 @@ export async function runProviderFormScreen(
         kind: 'push',
         route: {
           kind: 'modelList',
+          invocation: 'addProvider',
           models: draft.models,
           providerLabel: draft.name ?? originalName ?? 'Provider',
           requireAtLeastOne: false,
