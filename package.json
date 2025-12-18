@@ -120,11 +120,13 @@
                 "description": "API format type. Determines how requests are formatted.",
                 "enum": [
                   "anthropic",
-                  "openai-chat-completion"
+                  "openai-chat-completion",
+                  "openai-responses"
                 ],
                 "enumDescriptions": [
                   "Anthropic Messages API",
-                  "OpenAI Chat Completion API"
+                  "OpenAI Chat Completion API",
+                  "OpenAI Responses API"
                 ]
               },
               "name": {

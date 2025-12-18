@@ -176,9 +176,7 @@ export class AnthropicProvider implements ApiProvider {
           break;
 
         default:
-          throw new Error(
-            `Unsupported message role for Anthropic provider: ${msg.role}`,
-          );
+          throw new Error(`Unsupported message role for provider: ${msg.role}`);
       }
     }
 
@@ -356,7 +354,7 @@ export class AnthropicProvider implements ApiProvider {
         return undefined;
       } else if (isImageMarker(part)) {
         if (role === vscode.LanguageModelChatMessageRole.System) {
-          throw new Error('Tool call parts can not appear in system messages');
+          throw new Error('Image parts can not appear in system messages');
         }
         const mimeType = normalizeImageMimeType(part.mimeType);
         if (!mimeType) {
@@ -413,7 +411,7 @@ export class AnthropicProvider implements ApiProvider {
         {
           type: 'tool_result',
           tool_use_id: part.callId,
-          content: content || [],
+          content,
           is_error: part.isError,
         },
       ];

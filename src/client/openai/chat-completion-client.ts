@@ -23,14 +23,15 @@ import {
   ChatCompletion,
   ChatCompletionAssistantMessageParam,
   ChatCompletionChunk,
-  ChatCompletionContentPart,
   ChatCompletionContentPartText,
   ChatCompletionCreateParamsBase,
   ChatCompletionFunctionTool,
   ChatCompletionMessage,
   ChatCompletionMessageParam,
-  ChatCompletionMessageToolCall,
+  ChatCompletionSystemMessageParam,
   ChatCompletionToolChoiceOption,
+  ChatCompletionToolMessageParam,
+  ChatCompletionUserMessageParam,
   OpenRouterReasoningDetail,
 } from 'openai/resources/chat/completions';
 import { FunctionParameters } from 'openai/resources/shared';
@@ -110,30 +111,20 @@ export class OpenAIChatCompletionProvider implements ApiProvider {
       switch (msg.role) {
         case vscode.LanguageModelChatMessageRole.System:
           for (const part of msg.content) {
-            const parts = this.convertPart(msg.role, part)?.parts as
-              | ChatCompletionContentPartText[]
+            const parts = this.convertPart(msg.role, part) as
+              | ChatCompletionSystemMessageParam
               | undefined;
-            if (parts) outMessages.push({ role: 'system', content: parts });
+            if (parts) outMessages.push(parts);
           }
           break;
 
         case vscode.LanguageModelChatMessageRole.User:
           for (const part of msg.content) {
-            const result = this.convertPart(msg.role, part);
-            if (result) {
-              if (result.isToolResult) {
-                outMessages.push({
-                  role: 'tool',
-                  content: result.parts as ChatCompletionContentPartText[],
-                  tool_call_id: result.toolResultId!,
-                });
-              } else {
-                outMessages.push({
-                  role: 'user',
-                  content: result.parts as ChatCompletionContentPart[],
-                });
-              }
-            }
+            const parts = this.convertPart(msg.role, part) as
+              | ChatCompletionUserMessageParam
+              | ChatCompletionToolMessageParam
+              | undefined;
+            if (parts) outMessages.push(parts);
           }
           break;
 
@@ -143,57 +134,30 @@ export class OpenAIChatCompletionProvider implements ApiProvider {
           ) as vscode.LanguageModelDataPart | undefined;
           if (rawPart) {
             try {
-              const raw = rawPart
-                ? decodeStatefulMarkerPart<ChatCompletionMessage>(
-                    encodedModelId,
-                    rawPart,
-                  )
-                : undefined;
-              if (raw) {
-                const message: ChatCompletionAssistantMessageParam = {
-                  role: 'assistant',
-                  content: undefined,
-                  tool_calls: undefined,
-                };
-                rawMap.set(message, raw);
-                outMessages.push(message);
-              }
+              const raw = decodeStatefulMarkerPart<ChatCompletionMessage>(
+                encodedModelId,
+                rawPart,
+              );
+              const message: ChatCompletionAssistantMessageParam = {
+                role: 'assistant',
+                content: undefined,
+                tool_calls: undefined,
+              };
+              rawMap.set(message, raw);
+              outMessages.push(message);
             } catch (error) {}
           } else {
             for (const part of msg.content) {
-              const result = this.convertPart(msg.role, part);
-              if (result)
-                outMessages.push(
-                  result.isToolCall
-                    ? {
-                        role: 'assistant',
-                        tool_calls:
-                          result.parts as ChatCompletionMessageToolCall[],
-                      }
-                    : result.isThinking
-                    ? {
-                        role: 'assistant',
-                        ...this.buildReasoningContent(
-                          result.parts as
-                            | ChatCompletionContentPartText[]
-                            | string,
-                          reasoningType,
-                        ),
-                      }
-                    : {
-                        role: 'assistant',
-                        content:
-                          result.parts as ChatCompletionContentPartText[],
-                      },
-                );
+              const parts = this.convertPart(msg.role, part, reasoningType) as
+                | ChatCompletionAssistantMessageParam
+                | undefined;
+              if (parts) outMessages.push(parts);
             }
           }
           break;
 
         default:
-          throw new Error(
-            `Unsupported message role for Anthropic provider: ${msg.role}`,
-          );
+          throw new Error(`Unsupported message role for provider: ${msg.role}`);
       }
     }
 
@@ -211,36 +175,6 @@ export class OpenAIChatCompletionProvider implements ApiProvider {
     }
 
     return outMessages;
-  }
-
-  private buildReasoningContent(
-    parts: ChatCompletionContentPartText[] | string,
-    reasoningType: 'content' | 'details' | 'none',
-  ): Omit<ChatCompletionAssistantMessageParam, 'role'> {
-    const reasoning =
-      typeof parts === 'string' ? parts : parts.map((v) => v.text).join('');
-    return reasoningType === 'content'
-      ? {
-          reasoning_content: reasoning,
-        }
-      : reasoningType === 'details'
-      ? {
-          reasoning_details:
-            typeof parts === 'string'
-              ? [
-                  {
-                    type: 'reasoning.text',
-                    index: 0,
-                    text: parts,
-                  },
-                ]
-              : parts.map((part, index) => ({
-                  type: 'reasoning.text',
-                  index,
-                  text: part.text,
-                })),
-        }
-      : {};
   }
 
   private applyCacheControl(messages: ChatCompletionMessageParam[]): void {
@@ -286,26 +220,38 @@ export class OpenAIChatCompletionProvider implements ApiProvider {
   }
 
   convertPart(
-    role: vscode.LanguageModelChatMessageRole | 'tool_result',
+    role: vscode.LanguageModelChatMessageRole | 'from_tool_result',
     part: vscode.LanguageModelInputPart | unknown,
+    reasoningType: 'content' | 'details' | 'none' = 'none',
   ):
-    | {
-        parts:
-          | (ChatCompletionContentPart | ChatCompletionMessageToolCall)[]
-          | string;
-        isThinking?: boolean;
-        isToolCall?: boolean;
-        isToolResult?: boolean;
-        toolResultId?: string;
-      }
+    | ChatCompletionToolMessageParam
+    | ChatCompletionUserMessageParam
+    | ChatCompletionSystemMessageParam
+    | ChatCompletionAssistantMessageParam
+    | ChatCompletionContentPartText[]
     | undefined {
     if (part == null) {
       return undefined;
     }
 
+    const roleStr: 'assistant' | 'system' | 'user' =
+      role === vscode.LanguageModelChatMessageRole.Assistant
+        ? 'assistant'
+        : role === vscode.LanguageModelChatMessageRole.System
+        ? 'system'
+        : 'user';
+
     if (part instanceof vscode.LanguageModelTextPart) {
       if (part.value.trim()) {
-        return { parts: [{ type: 'text', text: part.value }] };
+        const content: ChatCompletionContentPartText[] = [
+          { type: 'text', text: part.value },
+        ];
+        return role === 'from_tool_result'
+          ? content
+          : {
+              role: roleStr,
+              content: [{ type: 'text', text: part.value }],
+            };
       } else {
         return undefined;
       }
@@ -314,26 +260,52 @@ export class OpenAIChatCompletionProvider implements ApiProvider {
         throw new Error('Thinking parts can only appear in assistant messages');
       }
       const metadata = part.metadata as ThinkingBlockMetadata | undefined;
-      if (metadata?.redactedData) {
-        // from VSCode.
+      const contents =
+        typeof part.value === 'string' ? [part.value] : part.value;
+      if (reasoningType === 'content') {
+        // content type doesn't support encrypted thinking and signature.
         return {
-          parts: metadata.redactedData,
-          isThinking: true,
+          role: 'assistant',
+          reasoning_content: contents.join(''),
         };
-      } else if (metadata?._completeThinking) {
-        // from VSCode.
-        return {
-          parts: metadata._completeThinking,
-          isThinking: true,
-        };
+      } else if (reasoningType === 'details') {
+        if (metadata?.redactedData) {
+          // from VSCode.
+          return {
+            role: 'assistant',
+            reasoning_details: [
+              {
+                type: 'reasoning.encrypted',
+                index: 0,
+                data: metadata.redactedData,
+              },
+            ],
+          };
+        } else if (metadata?._completeThinking) {
+          // from VSCode.
+          return {
+            role: 'assistant',
+            reasoning_details: [
+              {
+                type: 'reasoning.text',
+                index: 0,
+                text: metadata._completeThinking,
+                signature: metadata.signature,
+              },
+            ],
+          };
+        } else {
+          return {
+            role: 'assistant',
+            reasoning_details: contents.map((v, i) => ({
+              type: 'reasoning.text',
+              index: i,
+              text: v,
+            })),
+          };
+        }
       } else {
-        return {
-          parts:
-            typeof part.value === 'string'
-              ? part.value
-              : part.value.map((v) => ({ type: 'text', text: v })),
-          isThinking: true,
-        };
+        return undefined;
       }
     } else if (part instanceof vscode.LanguageModelDataPart) {
       if (isCacheControlMarker(part)) {
@@ -345,10 +317,10 @@ export class OpenAIChatCompletionProvider implements ApiProvider {
         if (
           role === vscode.LanguageModelChatMessageRole.Assistant ||
           role === vscode.LanguageModelChatMessageRole.System ||
-          role === 'tool_result'
+          role === 'from_tool_result'
         ) {
           throw new Error(
-            'Tool call parts can not appear in system, assistant, or tool_result messages',
+            'Image parts can not appear in system, assistant, or tool_result messages',
           );
         }
         const mimeType = normalizeImageMimeType(part.mimeType);
@@ -358,7 +330,8 @@ export class OpenAIChatCompletionProvider implements ApiProvider {
           );
         }
         return {
-          parts: [
+          role: 'user',
+          content: [
             {
               type: 'image_url',
               image_url: {
@@ -381,7 +354,8 @@ export class OpenAIChatCompletionProvider implements ApiProvider {
         );
       }
       return {
-        parts: [
+        role: 'assistant',
+        tool_calls: [
           {
             id: part.callId,
             type: 'function',
@@ -391,7 +365,6 @@ export class OpenAIChatCompletionProvider implements ApiProvider {
             },
           },
         ],
-        isToolCall: true,
       };
     } else if (
       part instanceof vscode.LanguageModelToolResultPart ||
@@ -403,21 +376,21 @@ export class OpenAIChatCompletionProvider implements ApiProvider {
       const content = part.content
         .map(
           (v) =>
-            this.convertPart('tool_result', v)?.parts as
+            this.convertPart('from_tool_result', v) as
               | ChatCompletionContentPartText[]
               | undefined,
         )
         .filter((v) => v !== undefined)
         .flat();
       return {
-        parts:
+        role: 'tool',
+        content:
           content.length > 1
             ? content
             : content.length > 0
             ? content[0].text
             : '',
-        isToolResult: true,
-        toolResultId: part.callId,
+        tool_call_id: part.callId,
       };
     } else {
       throw new Error(`Unsupported ${role} message part type encountered`);
@@ -477,7 +450,7 @@ export class OpenAIChatCompletionProvider implements ApiProvider {
     return undefined;
   }
 
-  private buildThinkingParams(
+  private buildReasoningParams(
     model: ModelConfig,
     type: 'reasoning' | 'thinking' | 'official',
   ): Partial<ChatCompletionCreateParamsBase> {
@@ -601,7 +574,7 @@ export class OpenAIChatCompletionProvider implements ApiProvider {
     const baseBody: ChatCompletionCreateParamsBase = {
       model: getBaseModelId(model.id),
       messages: convertedMessages,
-      ...this.buildThinkingParams(model, thinkingParamType),
+      ...this.buildReasoningParams(model, thinkingParamType),
       ...(model.maxOutputTokens !== undefined
         ? isFeatureSupported(
             FeatureId.OpenAIOnlyUseMaxCompletionTokens,
