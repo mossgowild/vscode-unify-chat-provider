@@ -131,6 +131,7 @@ This includes:
 - Precise thinking contents to reduce the amount of network data (OpenAIConciseReasoning and Anthropic thinking).
 - Support monitoring of balance usage.
 - Embedded functionality similar to [CLIProxyAPI](https://github.com/router-for-me/CLIProxyAPI).
+- Context Indicator, official related issue：https://github.com/microsoft/vscode/issues/277871, https://github.com/microsoft/vscode/issues/277414
 
 ## License
 

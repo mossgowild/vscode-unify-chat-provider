@@ -199,7 +199,7 @@ export async function confirmDiscardModelChanges(
 export function formatModelDetail(model: ModelConfig): string | undefined {
   const parts: string[] = [];
   if (model.maxInputTokens) {
-    parts.push(`Input/Context: ${model.maxInputTokens.toLocaleString()}`);
+    parts.push(`Input: ${model.maxInputTokens.toLocaleString()}`);
   }
   if (model.maxOutputTokens) {
     parts.push(`Output: ${model.maxOutputTokens.toLocaleString()}`);
