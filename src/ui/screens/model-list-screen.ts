@@ -94,7 +94,7 @@ export async function runModelListScreen(
     onInlineAction: async (item, qp) => {
       // Handle toggle-auto-fetch inline without closing the picker
       if (item.action === 'toggle-auto-fetch') {
-        if (route.draft && route.invocation === 'providerEdit') {
+        if (route.draft) {
           const wasEnabled = route.draft.autoFetchOfficialModels ?? false;
           const nowEnabled = !wasEnabled;
           route.draft.autoFetchOfficialModels = nowEnabled;
@@ -426,8 +426,8 @@ function buildModelListItems(
     },
   );
 
-  // Auto-fetch toggle and status section (only for provider edit mode)
-  if (route.invocation === 'providerEdit' && route.draft) {
+  // Auto-fetch toggle and status section
+  if (route.draft) {
     items.push({ label: '', kind: vscode.QuickPickItemKind.Separator });
 
     // Toggle item
@@ -518,8 +518,9 @@ function buildModelListItems(
       items.push({ label: '$(check) Save', action: 'save' });
     }
 
+    items.push({ label: '$(copy) Copy', action: 'provider-copy' });
+
     if (route.existing && route.draft) {
-      items.push({ label: '$(copy) Copy', action: 'provider-copy' });
       items.push({ label: '$(files) Duplicate', action: 'provider-duplicate' });
       items.push({ label: '$(trash) Delete', action: 'provider-delete' });
     }
@@ -590,10 +591,7 @@ function formatTimeAgo(date: Date): string {
 async function updateOfficialModelsDataForRoute(
   route: ModelListRoute,
 ): Promise<void> {
-  if (
-    route.invocation !== 'providerEdit' ||
-    !route.draft?.autoFetchOfficialModels
-  ) {
+  if (!route.draft?.autoFetchOfficialModels) {
     route.officialModelsData = undefined;
     return;
   }

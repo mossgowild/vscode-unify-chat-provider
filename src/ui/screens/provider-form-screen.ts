@@ -1,10 +1,6 @@
 import * as vscode from 'vscode';
 import { ConfigStore } from '../../config-store';
-import {
-  confirmDelete,
-  pickQuickItem,
-  showDeletedMessage,
-} from '../component';
+import { confirmDelete, pickQuickItem, showDeletedMessage } from '../component';
 import {
   mergePartialProviderConfig,
   showCopiedBase64Config,
@@ -16,7 +12,10 @@ import {
   createProviderDraft,
   type ProviderFormDraft,
 } from '../form-utils';
-import { providerFormSchema, type ProviderFieldContext } from '../provider-fields';
+import {
+  providerFormSchema,
+  type ProviderFieldContext,
+} from '../provider-fields';
 import type {
   ProviderFormRoute,
   UiContext,
@@ -69,15 +68,15 @@ export async function runProviderFormScreen(
         ? `Provider Settings (${existing.name})`
         : 'Provider Settings'
       : existing
-        ? 'Edit Provider'
-        : 'Add Provider',
+      ? 'Edit Provider'
+      : 'Add Provider',
     placeholder: 'Select a field to edit',
     ignoreFocusOut: true,
     items: buildFormItems(
       isSettings ? providerSettingsSchema : providerFormSchema,
       draft,
       {
-        isEditing: !!existing,
+        isEditing: !isSettings && !!existing,
         hasConfirm: !isSettings,
         hasCopy: !isSettings,
       },
