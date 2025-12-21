@@ -318,7 +318,7 @@ export class OllamaProvider implements ApiProvider {
           {
             function: {
               name: part.name,
-              arguments: this.normalizeToolArguments(part.input),
+              arguments: part.input,
             },
           },
         ],
@@ -343,13 +343,6 @@ export class OllamaProvider implements ApiProvider {
     } else {
       throw new Error(`Unsupported ${role} message part type encountered`);
     }
-  }
-
-  private normalizeToolArguments(input: unknown): Record<string, unknown> {
-    if (typeof input === 'object' && input !== null) {
-      return input as Record<string, unknown>;
-    }
-    return {};
   }
 
   private convertTools(
@@ -529,7 +522,7 @@ export class OllamaProvider implements ApiProvider {
         yield new vscode.LanguageModelToolCallPart(
           this.generateToolCallId(call.function.name, index),
           call.function.name,
-          this.normalizeToolArguments(call.function.arguments),
+          call.function.arguments,
         );
       }
     }
@@ -600,7 +593,7 @@ export class OllamaProvider implements ApiProvider {
           yield new vscode.LanguageModelToolCallPart(
             this.generateToolCallId(call.function.name, index),
             call.function.name,
-            this.normalizeToolArguments(call.function.arguments),
+            call.function.arguments,
           );
         }
       }

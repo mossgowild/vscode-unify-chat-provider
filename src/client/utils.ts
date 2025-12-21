@@ -242,7 +242,8 @@ export function processUsage(
 ): void {
   if (outputTokens) {
     performanceTrace.tps =
-      (outputTokens / (Date.now() - (performanceTrace.tts + performanceTrace.ttf))) *
+      (outputTokens /
+        (Date.now() - (performanceTrace.tts + performanceTrace.ttf))) *
       1000;
   } else {
     performanceTrace.tps = NaN;
@@ -264,6 +265,42 @@ export function createFirstTokenRecorder(
       recorded = true;
     }
   };
+}
+
+/**
+ * Parse tool arguments from a JSON string.
+ * If parsing fails, returns a special object to help the model correct itself.
+ */
+export function parseToolArguments(
+  json: string,
+  type: 'feedback' | 'loose' | 'throw' = 'feedback',
+): object {
+  const trimmed = json.trim();
+  if (!trimmed) {
+    return {};
+  }
+  try {
+    const parsed = JSON.parse(trimmed);
+    if (typeof parsed === 'object' && parsed !== null) {
+      return parsed;
+    }
+    throw new Error('Parsed JSON is not an object');
+  } catch (err) {
+    switch (type) {
+      case 'feedback':
+        return {
+          INVALID_JSON: json,
+        };
+
+      case 'loose':
+        return {};
+
+      case 'throw':
+        throw new Error(
+          `Failed to parse tool arguments JSON: ${(err as Error).message}`,
+        );
+    }
+  }
 }
 
 /**

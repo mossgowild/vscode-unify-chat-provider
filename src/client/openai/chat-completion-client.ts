@@ -25,6 +25,7 @@ import {
   estimateTokenCount as sharedEstimateTokenCount,
   isFeatureSupported,
   mergeHeaders,
+  parseToolArguments,
   processUsage as sharedProcessUsage,
 } from '../utils';
 import * as vscode from 'vscode';
@@ -711,14 +712,7 @@ export class OpenAIChatCompletionProvider implements ApiProvider {
   private parseArguments(
     call: OpenAI.Chat.Completions.ChatCompletionMessageFunctionToolCall,
   ) {
-    let parsedArgs: object = {};
-    try {
-      const value = JSON.parse(call.function.arguments);
-      parsedArgs = typeof value === 'object' && value !== null ? value : {};
-    } catch {
-      parsedArgs = {};
-    }
-    return parsedArgs;
+    return parseToolArguments(call.function.arguments);
   }
 
   private normalizeThinkingContents(

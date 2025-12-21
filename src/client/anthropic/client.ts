@@ -43,6 +43,7 @@ import {
   estimateTokenCount as sharedEstimateTokenCount,
   isFeatureSupported,
   mergeHeaders,
+  parseToolArguments,
   processUsage as sharedProcessUsage,
 } from '../utils';
 
@@ -1168,19 +1169,10 @@ export class AnthropicProvider implements ApiProvider {
           const toolContent = snapshotContent as TracksToolInput &
             ToolInputJsonBuffer;
           const jsonBuf = toolContent.__json_buf ?? '';
-          try {
-            snapshotContent.input = jsonBuf.trim() ? JSON.parse(jsonBuf) : {};
-          } catch (err) {
-            if (fineGrainedToolStreamingEnabled) {
-              snapshotContent.input = {
-                INVALID_JSON: jsonBuf,
-              };
-            } else {
-              throw new Error(
-                'Unable to parse tool parameter JSON from model. Please retry your request or adjust your prompt',
-              );
-            }
-          }
+          snapshotContent.input = parseToolArguments(
+            jsonBuf,
+            fineGrainedToolStreamingEnabled ? 'feedback' : undefined,
+          );
         }
         return snapshot;
 

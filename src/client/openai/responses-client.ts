@@ -24,6 +24,7 @@ import {
   createFirstTokenRecorder,
   estimateTokenCount as sharedEstimateTokenCount,
   mergeHeaders,
+  parseToolArguments,
   processUsage as sharedProcessUsage,
 } from '../utils';
 import * as vscode from 'vscode';
@@ -527,14 +528,7 @@ export class OpenAIResponsesProvider implements ApiProvider {
   }
 
   private parseArguments(argumentsJson: string): object {
-    let parsedArgs: object = {};
-    try {
-      const value = JSON.parse(argumentsJson);
-      parsedArgs = typeof value === 'object' && value !== null ? value : {};
-    } catch {
-      parsedArgs = {};
-    }
-    return parsedArgs;
+    return parseToolArguments(argumentsJson);
   }
 
   private *extractThinkingParts(
