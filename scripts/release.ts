@@ -105,7 +105,9 @@ try {
 
   const sections = groupCommits(commits);
   const changelogEntry = renderChangelogEntry({ version: nextVersion, date, sections });
-  const githubReleaseNotes = renderGitHubReleaseNotes({ version: nextVersion, date, sections });
+
+  // Create temp file for user to edit changelog
+  const changelogTempFile = await writeChangelogTempFile(changelogEntry);
 
   printSummary({
     extensionName,
@@ -116,11 +118,10 @@ try {
     headSha,
     baseTag,
     commits,
-    changelogEntry,
-    githubReleaseNotes,
     skipPublish,
     skipGitHub,
     dryRun,
+    changelogTempFile,
   });
 
   if (!yes) {
@@ -135,13 +136,17 @@ try {
     }
   }
 
+  // Read back the (possibly edited) changelog content
+  const finalChangelogEntry = await readTextFile(changelogTempFile);
+  const githubReleaseNotes = changelogToGitHubReleaseNotes(finalChangelogEntry);
+
   if (dryRun) {
     console.log('Dry-run: no files modified and no commands executed.');
     process.exit(0);
   }
 
   await updatePackageJsonVersion(pkgPath, pkgText, nextVersion);
-  await upsertChangelog(join(repoRoot, 'CHANGELOG.md'), changelogEntry);
+  await upsertChangelog(join(repoRoot, 'CHANGELOG.md'), finalChangelogEntry);
 
   const doCommitAndTag = yes
     ? true
@@ -429,29 +434,6 @@ function renderChangelogEntry(params: {
   return lines.join('\n');
 }
 
-function renderGitHubReleaseNotes(params: {
-  version: string;
-  date: string;
-  sections: Section[];
-}): string {
-  const lines: string[] = [];
-  lines.push(`## v${params.version} (${params.date})`, '');
-  const hasCommits = params.sections.some(s => s.commits.length > 0);
-  if (!hasCommits) {
-    lines.push('No changes recorded.');
-    return lines.join('\n');
-  }
-  for (const section of params.sections) {
-    if (section.commits.length === 0) continue;
-    lines.push(`### ${section.title}`);
-    for (const commit of section.commits) {
-      lines.push(`- ${formatCommitTitle(commit)} (${commit.shortHash})`);
-    }
-    lines.push('');
-  }
-  return lines.join('\n');
-}
-
 function printSummary(params: {
   extensionName: string;
   currentVersion: string;
@@ -461,11 +443,10 @@ function printSummary(params: {
   headSha: string;
   baseTag: string | null;
   commits: Commit[];
-  changelogEntry: string;
-  githubReleaseNotes: string;
   skipPublish: boolean;
   skipGitHub: boolean;
   dryRun: boolean;
+  changelogTempFile: string;
 }): void {
   console.log('');
   console.log('Release summary');
@@ -480,16 +461,8 @@ function printSummary(params: {
   console.log(`- Publish:   ${params.skipPublish ? 'skip' : 'VS Code Marketplace (vsce publish)'}`);
   console.log(`- GitHub:    ${params.skipGitHub ? 'skip' : 'Create Release + upload VSIX'}`);
   console.log(`- Mode:      ${params.dryRun ? 'dry-run' : 'live'}`);
-
   console.log('');
-  console.log('CHANGELOG.md entry (preview)');
-  console.log('----------------------------');
-  console.log(params.changelogEntry.trimEnd());
-
-  console.log('');
-  console.log('GitHub Release notes (preview)');
-  console.log('------------------------------');
-  console.log(params.githubReleaseNotes.trimEnd());
+  console.log(`Edit changelog: ${params.changelogTempFile}`);
   console.log('');
 }
 
@@ -722,6 +695,18 @@ async function writeTempNotes(notes: string): Promise<string> {
   const file = join(dir, 'notes.md');
   await writeFile(file, notes.trimEnd() + '\n', 'utf8');
   return file;
+}
+
+async function writeChangelogTempFile(changelogEntry: string): Promise<string> {
+  const dir = await mkdtemp(join(tmpdir(), 'release-changelog-'));
+  const file = join(dir, 'CHANGELOG_EDIT.md');
+  await writeFile(file, changelogEntry.trimEnd() + '\n', 'utf8');
+  return file;
+}
+
+function changelogToGitHubReleaseNotes(changelogEntry: string): string {
+  // Convert CHANGELOG format "## v1.0.0 - 2025-01-01" to GitHub format "## v1.0.0 (2025-01-01)"
+  return changelogEntry.replace(/^(## v[\d.]+) - (\d{4}-\d{2}-\d{2})/, '$1 ($2)');
 }
 
 async function confirm(
