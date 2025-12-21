@@ -170,15 +170,15 @@ try {
   }
 
   const vsixPath = join(repoRoot, `${extensionName}-${nextVersion}.vsix`);
-  await runInherit(repoRoot, 'vsce', [
-    'package',
-    '--out',
-    vsixPath,
-    '--allow-all-proposed-apis',
-  ]);
+  await runInherit(repoRoot, 'vsce', ['package', '--out', vsixPath]);
 
   if (!skipPublish) {
-    await runInherit(repoRoot, 'vsce', ['publish', '--packagePath', vsixPath]);
+    await runInherit(repoRoot, 'vsce', [
+      'publish',
+      '--packagePath',
+      vsixPath,
+      '--allow-all-proposed-apis',
+    ]);
   }
 
   // Create git tag after successful packaging/publishing to avoid manual cleanup on failure
@@ -444,9 +444,7 @@ function groupCommits(commits: Commit[]): Section[] {
   return sections;
 }
 
-function parseConventionalSubject(
-  subject: string,
-): {
+function parseConventionalSubject(subject: string): {
   type: string;
   scope?: string;
   breaking: boolean;
