@@ -74,6 +74,10 @@ export function registerCommands(
     vscode.commands.registerCommand('unifyChatProvider.addProvider', () =>
       addProvider(configStore, apiKeyStore),
     ),
+
+    vscode.commands.registerCommand('unifyChatProvider.removeProvider', () =>
+      removeProvider(configStore, apiKeyStore),
+    ),
     vscode.commands.registerCommand(
       'unifyChatProvider.addProviderFromConfig',
       () => addProviderFromConfig(configStore, apiKeyStore),
@@ -84,9 +88,6 @@ export function registerCommands(
     ),
     vscode.commands.registerCommand('unifyChatProvider.importProviders', () =>
       importProviders(configStore, apiKeyStore),
-    ),
-    vscode.commands.registerCommand('unifyChatProvider.removeProvider', () =>
-      removeProvider(configStore, apiKeyStore),
     ),
     vscode.commands.registerCommand('unifyChatProvider.manageProviders', () =>
       manageProviders(configStore, apiKeyStore),

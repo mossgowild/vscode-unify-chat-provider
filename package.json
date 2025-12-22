@@ -103,6 +103,10 @@
         "title": "Unify Chat Provider: Add Provider"
       },
       {
+        "command": "unifyChatProvider.removeProvider",
+        "title": "Unify Chat Provider: Remove Provider"
+      },
+      {
         "command": "unifyChatProvider.addProviderFromConfig",
         "title": "Unify Chat Provider: Add Provider From Config"
       },
@@ -113,10 +117,6 @@
       {
         "command": "unifyChatProvider.importProviders",
         "title": "Unify Chat Provider: Import Config From Other Applications"
-      },
-      {
-        "command": "unifyChatProvider.removeProvider",
-        "title": "Unify Chat Provider: Remove Provider"
       },
       {
         "command": "unifyChatProvider.manageProviders",

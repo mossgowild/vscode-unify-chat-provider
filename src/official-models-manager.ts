@@ -395,11 +395,10 @@ export class OfficialModelsManager {
     | { kind: 'error'; message: string } {
     const missing: string[] = [];
 
-    const name = input.name?.trim();
+    const name = input.name?.trim() || 'Draft Provider';
     const type = input.type;
     const baseUrlRaw = input.baseUrl?.trim();
 
-    if (!name) missing.push('Name');
     if (!type) missing.push('API Format');
     if (!baseUrlRaw) missing.push('API base URL');
 
@@ -407,7 +406,7 @@ export class OfficialModelsManager {
       return { kind: 'error', message: this.formatMissingFieldsError(missing) };
     }
 
-    if (!name || !type || !baseUrlRaw) {
+    if (!type || !baseUrlRaw) {
       return {
         kind: 'error',
         message:
