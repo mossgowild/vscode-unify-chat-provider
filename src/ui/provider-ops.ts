@@ -18,6 +18,7 @@ import {
   type ProviderFormDraft,
 } from './form-utils';
 import { ProviderConfig } from '../types';
+import { officialModelsManager } from '../official-models-manager';
 
 async function applyApiKeyStoragePolicy(options: {
   store: ConfigStore;
@@ -98,6 +99,20 @@ export async function saveProviderDraft(options: {
     await options.store.removeProvider(options.originalName);
   }
   await options.store.upsertProvider(provider);
+
+  // Handle official models state migration
+  const sessionId = options.draft._officialModelsSessionId;
+  if (sessionId) {
+    if (options.draft.autoFetchOfficialModels) {
+      await officialModelsManager.migrateDraftToProvider(
+        sessionId,
+        provider.name,
+      );
+    } else {
+      officialModelsManager.clearDraftSession(sessionId);
+    }
+  }
+
   vscode.window.showInformationMessage(
     options.existing
       ? `Provider "${provider.name}" updated.`

@@ -45,6 +45,8 @@ export interface ModelListRoute {
   invocation: 'addProvider' | 'addFromWellKnownProvider' | 'providerEdit';
   models: ModelConfig[];
   providerLabel: string;
+  /** Unique session ID for draft state management */
+  draftSessionId?: string;
   officialModelsData?: {
     models: ModelConfig[];
     state: OfficialModelsFetchState | undefined;

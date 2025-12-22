@@ -17,6 +17,8 @@ import { ProviderConfig, ModelConfig } from '../types';
  */
 export type ProviderFormDraft = Omit<Partial<ProviderConfig>, 'models'> & {
   models: ModelConfig[];
+  /** Internal: Session ID for official models draft state (not persisted) */
+  _officialModelsSessionId?: string;
 };
 
 /**
@@ -90,13 +92,13 @@ export function thinkingEqual(
 }
 
 function toComparableProviderDraft(draft: ProviderFormDraft): unknown {
-  const cloned = deepClone(draft);
+  const { _officialModelsSessionId: _, ...rest } = deepClone(draft);
   return {
-    ...cloned,
-    name: cloned.name?.trim() ?? '',
-    baseUrl: cloned.baseUrl?.trim() ?? '',
-    apiKey: cloned.apiKey?.trim() ?? '',
-    models: cloned.models.map(toComparableModelConfig),
+    ...rest,
+    name: rest.name?.trim() ?? '',
+    baseUrl: rest.baseUrl?.trim() ?? '',
+    apiKey: rest.apiKey?.trim() ?? '',
+    models: rest.models.map(toComparableModelConfig),
   };
 }
 

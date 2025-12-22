@@ -9,7 +9,6 @@ import {
 import {
   confirmDiscardProviderChanges,
   formatModelDetail,
-  normalizeProviderDraft,
   removeModel,
 } from '../form-utils';
 import type {
@@ -18,8 +17,7 @@ import type {
   UiNavAction,
   UiResume,
 } from '../router/types';
-import { createProvider } from '../../client/utils';
-import { ModelConfig, ProviderConfig } from '../../types';
+import { ModelConfig } from '../../types';
 import {
   buildProviderConfigFromDraft,
   duplicateProvider,
@@ -30,8 +28,44 @@ import {
 } from '../../api-key-utils';
 import {
   officialModelsManager,
+  OfficialModelsDraftInput,
   OfficialModelsFetchState,
 } from '../../official-models-manager';
+
+/**
+ * Generate a unique session ID for draft state management
+ */
+function generateSessionId(): string {
+  return `draft-${Date.now()}-${Math.random().toString(36).substring(2, 9)}`;
+}
+
+/**
+ * Ensure draft has a session ID.
+ * Session ID is stored on draft object to persist across route recreations.
+ */
+function ensureDraftSessionId(route: ModelListRoute): string {
+  // Prefer draft's session ID (persists across route recreations)
+  if (route.draft?._officialModelsSessionId) {
+    route.draftSessionId = route.draft._officialModelsSessionId;
+    return route.draftSessionId;
+  }
+
+  // Fall back to route's session ID
+  if (route.draftSessionId) {
+    if (route.draft) {
+      route.draft._officialModelsSessionId = route.draftSessionId;
+    }
+    return route.draftSessionId;
+  }
+
+  // Generate new session ID
+  const newSessionId = generateSessionId();
+  route.draftSessionId = newSessionId;
+  if (route.draft) {
+    route.draft._officialModelsSessionId = newSessionId;
+  }
+  return newSessionId;
+}
 
 type ModelListItem = vscode.QuickPickItem & {
   action?:
@@ -69,20 +103,19 @@ export async function runModelListScreen(
   let didSave = false;
   await updateOfficialModelsDataForRoute(route);
 
+  // Ensure we have a session ID for draft state management
+  const sessionId = ensureDraftSessionId(route);
+
   const selection = await pickQuickItem<ModelListItem>({
     title,
     placeholder: 'Select a model to edit, or add a new one',
     ignoreFocusOut: true,
     items: buildModelListItems(route, includeSave),
     onExternalRefresh: (refreshItems) => {
-      // Subscribe to official models updates to refresh UI when fetch completes
-      const provider = buildProviderConfigForOfficialModels(route);
-      if (!provider) {
-        return { dispose: () => {} };
-      }
-      return officialModelsManager.onDidUpdate((updatedProviderName) => {
-        if (updatedProviderName === provider.name) {
-          const state = officialModelsManager.getProviderState(provider.name);
+      // Subscribe to official models updates using session ID
+      return officialModelsManager.onDidUpdate((updatedId) => {
+        if (updatedId === sessionId) {
+          const state = officialModelsManager.getDraftSessionState(sessionId);
           route.officialModelsData = {
             models: state?.models ?? [],
             state,
@@ -100,20 +133,11 @@ export async function runModelListScreen(
           route.draft.autoFetchOfficialModels = nowEnabled;
 
           if (nowEnabled) {
-            if (!triggerOfficialModelsRefresh(route)) {
-              route.officialModelsData = { models: [], state: undefined };
-            }
+            triggerOfficialModelsRefresh(route, sessionId);
           } else {
-            // Disabled: clear all cached state immediately
+            // Disabled: clear draft session state
             route.officialModelsData = undefined;
-            const namesToClear = new Set<string>();
-            if (route.originalName) namesToClear.add(route.originalName);
-            if (route.draft.name) namesToClear.add(route.draft.name);
-            Promise.all(
-              [...namesToClear].map((name) =>
-                officialModelsManager.clearProviderState(name),
-              ),
-            );
+            officialModelsManager.clearDraftSession(sessionId);
           }
           qp.items = buildModelListItems(route, includeSave);
         }
@@ -122,7 +146,7 @@ export async function runModelListScreen(
 
       // Handle refresh-official inline without closing the picker
       if (item.action === 'refresh-official') {
-        triggerOfficialModelsRefresh(route);
+        triggerOfficialModelsRefresh(route, sessionId);
         qp.items = buildModelListItems(route, includeSave);
         return true;
       }
@@ -189,7 +213,11 @@ export async function runModelListScreen(
         route.draft,
         route.existing,
       );
-      if (decision === 'discard') return { kind: 'pop' };
+      if (decision === 'discard') {
+        // Clean up draft session when discarding changes
+        officialModelsManager.clearDraftSession(sessionId);
+        return { kind: 'pop' };
+      }
       if (decision === 'save') {
         if (!route.onSave) {
           vscode.window.showErrorMessage(
@@ -199,6 +227,7 @@ export async function runModelListScreen(
         }
         const result = await route.onSave();
         if (result === 'saved') {
+          // Migration is handled by saveProviderDraft via draft._officialModelsSessionId
           const afterSave = route.afterSave ?? 'pop';
           return afterSave === 'popToRoot'
             ? { kind: 'popToRoot' }
@@ -271,6 +300,7 @@ export async function runModelListScreen(
 
   if (selection.action === 'save') {
     if (!includeSave || !didSave) return { kind: 'stay' };
+    // Migration is handled by saveProviderDraft via draft._officialModelsSessionId
     const afterSave = route.afterSave ?? 'pop';
     return afterSave === 'popToRoot' ? { kind: 'popToRoot' } : { kind: 'pop' };
   }
@@ -294,29 +324,24 @@ export async function runModelListScreen(
   }
 
   if (selection.action === 'add-from-official') {
-    const provider = buildProviderConfigForOfficialModels(route);
-    if (!provider) {
-      vscode.window.showErrorMessage(
-        'Please configure API Format and Base URL first before fetching official models.',
-      );
-      return { kind: 'stay' };
-    }
-    const client = createProvider(provider);
-    if (!client.getAvailableModels) {
-      vscode.window.showErrorMessage(
-        'Fetching official models is not supported for this provider.',
-      );
-      return { kind: 'stay' };
-    }
-
+    const draftInput = buildOfficialModelsDraftInput(route);
     return {
       kind: 'push',
       route: {
         kind: 'modelSelection',
         title: 'Add From Official Model List',
         existingModels: route.models,
-        fetchModels: async () =>
-          officialModelsManager.getOfficialModels(provider, true),
+        fetchModels: async () => {
+          const result = await officialModelsManager.getOfficialModelsForDraft(
+            sessionId,
+            draftInput,
+            { forceFetch: true },
+          );
+          if (result.state?.lastError) {
+            throw new Error(result.state.lastError);
+          }
+          return result.models;
+        },
       },
     };
   }
@@ -543,6 +568,20 @@ function formatFetchStatus(state: OfficialModelsFetchState | undefined): {
     };
   }
 
+  // Check for errors first - even if lastFetchTime is 0 (first fetch failed)
+  if (state?.lastError) {
+    const errorDate = state.lastErrorTime
+      ? new Date(state.lastErrorTime)
+      : state.lastFetchTime
+      ? new Date(state.lastFetchTime)
+      : new Date();
+    return {
+      label: `$(warning) Last attempt: ${formatTimeAgo(errorDate)}`,
+      detail: `Error: ${state.lastError}`,
+      description: '(click to fetch)',
+    };
+  }
+
   if (!state || !state.lastFetchTime) {
     return {
       label: '$(refresh) Not fetched yet',
@@ -552,17 +591,6 @@ function formatFetchStatus(state: OfficialModelsFetchState | undefined): {
 
   const lastFetchDate = new Date(state.lastFetchTime);
   const timeAgo = formatTimeAgo(lastFetchDate);
-
-  if (state.lastError) {
-    const errorDate = state.lastErrorTime
-      ? new Date(state.lastErrorTime)
-      : lastFetchDate;
-    return {
-      label: `$(warning) Last attempt: ${formatTimeAgo(errorDate)}`,
-      detail: `Error: ${state.lastError}`,
-      description: '(click to fetch)',
-    };
-  }
 
   return {
     label: `$(refresh) Last fetched: ${timeAgo}`,
@@ -596,44 +624,54 @@ async function updateOfficialModelsDataForRoute(
     return;
   }
 
-  const provider = buildProviderConfigForOfficialModels(route);
-  if (!provider) {
-    route.officialModelsData = { models: [], state: undefined };
-    return;
+  const sessionId = ensureDraftSessionId(route);
+  const draftInput = buildOfficialModelsDraftInput(route);
+
+  // When editing an existing provider, try to load persisted state first
+  if (route.existing?.name && route.invocation === 'providerEdit') {
+    officialModelsManager.loadPersistedStateToDraft(
+      sessionId,
+      route.existing.name,
+      draftInput,
+    );
   }
 
-  route.officialModelsData = await officialModelsManager.getOfficialModelsData(
-    provider,
-  );
+  route.officialModelsData =
+    await officialModelsManager.getOfficialModelsForDraft(
+      sessionId,
+      draftInput,
+    );
 }
 
-function buildProviderConfigForOfficialModels(
+function buildOfficialModelsDraftInput(
   route: ModelListRoute,
-): ProviderConfig | undefined {
+): OfficialModelsDraftInput {
   const draft = route.draft;
-  if (!draft?.type) return undefined;
+  if (!draft) return {};
 
-  const name = (draft.name ?? route.originalName ?? route.providerLabel).trim();
-  const baseUrl = draft.baseUrl?.trim();
-  if (!name || !baseUrl) return undefined;
-
-  return normalizeProviderDraft({ ...draft, name, baseUrl });
+  return {
+    type: draft.type,
+    name: draft.name,
+    baseUrl: draft.baseUrl,
+    apiKey: draft.apiKey,
+    mimic: draft.mimic,
+    extraHeaders: draft.extraHeaders,
+    extraBody: draft.extraBody,
+    timeout: draft.timeout,
+  };
 }
 
 /**
  * Trigger a refresh of official models without blocking.
  * The UI will be updated via the onDidUpdate event.
  */
-function triggerOfficialModelsRefresh(route: ModelListRoute): boolean {
-  const provider = buildProviderConfigForOfficialModels(route);
-  if (!provider) {
-    return false;
-  }
+function triggerOfficialModelsRefresh(
+  route: ModelListRoute,
+  sessionId: string,
+): void {
+  const draftInput = buildOfficialModelsDraftInput(route);
+  officialModelsManager.triggerDraftRefresh(sessionId, draftInput);
 
-  // Trigger refresh without awaiting - UI will update via onDidUpdate event
-  officialModelsManager.getOfficialModelsData(provider, {
-    forceFetch: true,
-  });
-
-  return true;
+  const state = officialModelsManager.getDraftSessionState(sessionId);
+  route.officialModelsData = { models: state?.models ?? [], state };
 }

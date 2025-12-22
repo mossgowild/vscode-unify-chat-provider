@@ -4,6 +4,7 @@ import { createProvider } from './client/utils';
 import { mergeWithWellKnownModels } from './well-known/models';
 import { stableStringify } from './config-ops';
 import { ApiKeySecretStore } from './api-key-secret-store';
+import { normalizeBaseUrlInput } from './utils';
 
 /**
  * State for a single provider's official models fetch
@@ -25,6 +26,39 @@ export interface OfficialModelsFetchState {
   lastErrorTime?: number;
   /** Whether a fetch is currently in progress */
   isFetching?: boolean;
+}
+
+/**
+ * Configuration signature for detecting changes that require a refresh
+ */
+export interface FetchConfigSignature {
+  type: string;
+  baseUrl: string;
+  apiKeyHash: string;
+}
+
+/**
+ * Draft input for fetching official models.
+ * This can be incomplete and is validated inside the manager.
+ */
+export interface OfficialModelsDraftInput {
+  type?: ProviderConfig['type'];
+  name?: string;
+  baseUrl?: string;
+  apiKey?: string;
+  mimic?: ProviderConfig['mimic'];
+  extraHeaders?: ProviderConfig['extraHeaders'];
+  extraBody?: ProviderConfig['extraBody'];
+  timeout?: ProviderConfig['timeout'];
+}
+
+/**
+ * Draft session state for editing providers (in-memory only)
+ */
+interface DraftSessionState {
+  state: OfficialModelsFetchState;
+  /** Config signature when last fetch was started */
+  configSignature: FetchConfigSignature;
 }
 
 /**
@@ -62,7 +96,12 @@ export class OfficialModelsManager {
   private fetchInProgress = new Map<string, Promise<ModelConfig[]>>();
   private readonly onDidUpdateEmitter = new vscode.EventEmitter<string>();
 
-  /** Fired when a provider's official models are updated */
+  /** Draft session states (in-memory only, keyed by session ID) */
+  private draftSessions = new Map<string, DraftSessionState>();
+  /** Fetch in progress for draft sessions */
+  private draftFetchInProgress = new Map<string, Promise<ModelConfig[]>>();
+
+  /** Fired when a provider's or draft session's official models are updated */
   readonly onDidUpdate = this.onDidUpdateEmitter.event;
 
   /**
@@ -181,6 +220,7 @@ export class OfficialModelsManager {
   async getOfficialModels(
     provider: ProviderConfig,
     forceFetch = false,
+    throwError = false,
   ): Promise<ModelConfig[]> {
     const providerName = provider.name;
 
@@ -214,6 +254,17 @@ export class OfficialModelsManager {
    */
   private async doFetch(provider: ProviderConfig): Promise<ModelConfig[]> {
     const providerName = provider.name;
+
+    const configError = this.getProviderConfigError(provider);
+    if (configError) {
+      const state = this.ensureState(providerName);
+      state.lastError = configError;
+      state.lastErrorTime = Date.now();
+      state.isFetching = false;
+      await this.saveState();
+      this.onDidUpdateEmitter.fire(providerName);
+      return state.models;
+    }
 
     // Set fetching state and notify
     this.ensureState(providerName).isFetching = true;
@@ -292,6 +343,104 @@ export class OfficialModelsManager {
     }
   }
 
+  private getProviderConfigError(provider: ProviderConfig): string | undefined {
+    const missing: string[] = [];
+
+    if (!provider.name.trim()) missing.push('Name');
+    if (!provider.type) missing.push('API Format');
+    if (!provider.baseUrl.trim()) missing.push('API base URL');
+
+    if (missing.length === 0) return undefined;
+    return this.formatMissingFieldsError(missing);
+  }
+
+  private formatMissingFieldsError(missing: string[]): string {
+    if (missing.length === 1) {
+      return `Cannot fetch official models: configure ${missing[0]} first.`;
+    }
+
+    if (missing.length === 2) {
+      return `Cannot fetch official models: configure ${missing[0]} and ${missing[1]} first.`;
+    }
+
+    return `Cannot fetch official models: configure ${missing
+      .slice(0, -1)
+      .join(', ')} and ${missing[missing.length - 1]} first.`;
+  }
+
+  private normalizeDraftBaseUrlForSignature(raw: string | undefined): string {
+    const trimmed = raw?.trim() ?? '';
+    if (!trimmed) return '';
+    try {
+      return normalizeBaseUrlInput(trimmed);
+    } catch {
+      return trimmed;
+    }
+  }
+
+  private computeDraftConfigSignature(
+    input: OfficialModelsDraftInput,
+  ): FetchConfigSignature {
+    return {
+      type: input.type ?? '',
+      baseUrl: this.normalizeDraftBaseUrlForSignature(input.baseUrl),
+      apiKeyHash: this.hashString(input.apiKey?.trim() ?? ''),
+    };
+  }
+
+  private resolveDraftInput(
+    input: OfficialModelsDraftInput,
+  ):
+    | { kind: 'ok'; provider: ProviderConfig }
+    | { kind: 'error'; message: string } {
+    const missing: string[] = [];
+
+    const name = input.name?.trim();
+    const type = input.type;
+    const baseUrlRaw = input.baseUrl?.trim();
+
+    if (!name) missing.push('Name');
+    if (!type) missing.push('API Format');
+    if (!baseUrlRaw) missing.push('API base URL');
+
+    if (missing.length > 0) {
+      return { kind: 'error', message: this.formatMissingFieldsError(missing) };
+    }
+
+    if (!name || !type || !baseUrlRaw) {
+      return {
+        kind: 'error',
+        message:
+          'Cannot fetch official models: provider configuration is incomplete.',
+      };
+    }
+
+    let baseUrl: string;
+    try {
+      baseUrl = normalizeBaseUrlInput(baseUrlRaw);
+    } catch {
+      return {
+        kind: 'error',
+        message:
+          'Cannot fetch official models: please enter a valid API base URL.',
+      };
+    }
+
+    const provider: ProviderConfig = {
+      type,
+      name,
+      baseUrl,
+      apiKey: input.apiKey?.trim() || undefined,
+      models: [],
+      mimic: input.mimic,
+      extraHeaders: input.extraHeaders,
+      extraBody: input.extraBody,
+      timeout: input.timeout,
+    };
+
+    return { kind: 'ok', provider };
+  }
+
   private async resolveProvider(
     provider: ProviderConfig,
   ): Promise<ProviderConfig> {
@@ -352,6 +501,290 @@ export class OfficialModelsManager {
   async clearProviderState(providerName: string): Promise<void> {
     delete this.state[providerName];
     await this.saveState();
+  }
+
+  // ========== Draft Session Methods ==========
+
+  /**
+   * Compute a configuration signature for change detection
+   */
+  computeConfigSignature(provider: ProviderConfig): FetchConfigSignature {
+    return {
+      type: provider.type,
+      baseUrl: provider.baseUrl,
+      apiKeyHash: this.hashString(provider.apiKey ?? ''),
+    };
+  }
+
+  /**
+   * Simple hash for strings (for API key comparison without storing actual key)
+   */
+  private hashString(str: string): string {
+    let hash = 0;
+    for (let i = 0; i < str.length; i++) {
+      const char = str.charCodeAt(i);
+      hash = (hash << 5) - hash + char;
+      hash = hash & hash;
+    }
+    return hash.toString(36);
+  }
+
+  /**
+   * Get the draft session state for a session ID
+   */
+  getDraftSessionState(
+    sessionId: string,
+  ): OfficialModelsFetchState | undefined {
+    return this.draftSessions.get(sessionId)?.state;
+  }
+
+  /**
+   * Set a validation/config error for a draft session without attempting a fetch.
+   * This can be used by callers to surface draft validation errors.
+   */
+  setDraftSessionError(sessionId: string, message: string): void {
+    const session = this.ensureDraftSession(sessionId);
+    session.state.lastError = message;
+    session.state.lastErrorTime = Date.now();
+    session.state.isFetching = false;
+    this.onDidUpdateEmitter.fire(sessionId);
+  }
+
+  /**
+   * Ensure a draft session exists.
+   */
+  private ensureDraftSession(sessionId: string): DraftSessionState {
+    let session = this.draftSessions.get(sessionId);
+    if (!session) {
+      session = {
+        state: {
+          lastFetchTime: 0,
+          models: [],
+          modelsHash: '',
+          consecutiveIdenticalFetches: 0,
+          currentIntervalMs: FETCH_CONFIG.initialIntervalMs,
+        },
+        // Placeholder signature; real signature is set when a fetch is triggered.
+        configSignature: { type: '', baseUrl: '', apiKeyHash: '' },
+      };
+      this.draftSessions.set(sessionId, session);
+    }
+    return session;
+  }
+
+  /**
+   * Get official models for a draft session.
+   * Automatically detects config changes and triggers refresh when needed.
+   */
+  async getOfficialModelsForDraft(
+    sessionId: string,
+    draftInput: OfficialModelsDraftInput,
+    options?: { forceFetch?: boolean },
+  ): Promise<{
+    models: ModelConfig[];
+    state: OfficialModelsFetchState | undefined;
+  }> {
+    const session = this.draftSessions.get(sessionId);
+    const draftSignature = this.computeDraftConfigSignature(draftInput);
+    const resolved = this.resolveDraftInput(draftInput);
+
+    if (resolved.kind === 'error') {
+      const target = session ?? this.ensureDraftSession(sessionId);
+      target.configSignature = draftSignature;
+      target.state.lastError = resolved.message;
+      target.state.lastErrorTime = Date.now();
+      target.state.isFetching = false;
+      this.onDidUpdateEmitter.fire(sessionId);
+      return { models: target.state.models, state: target.state };
+    }
+
+    const provider = resolved.provider;
+    const currentSignature = this.computeConfigSignature(provider);
+
+    // Check if config changed since last fetch
+    const configChanged =
+      session &&
+      !this.signaturesEqual(session.configSignature, currentSignature);
+
+    const forceFetch =
+      options?.forceFetch || configChanged || !!session?.state.lastError;
+
+    if (forceFetch || !session) {
+      await this.fetchForDraft(sessionId, provider, currentSignature);
+    }
+
+    const state = this.getDraftSessionState(sessionId);
+    return { models: state?.models ?? [], state };
+  }
+
+  /**
+   * Check if two config signatures are equal
+   */
+  private signaturesEqual(
+    a: FetchConfigSignature,
+    b: FetchConfigSignature,
+  ): boolean {
+    return (
+      a.type === b.type &&
+      a.baseUrl === b.baseUrl &&
+      a.apiKeyHash === b.apiKeyHash
+    );
+  }
+
+  /**
+   * Fetch models for a draft session
+   */
+  private async fetchForDraft(
+    sessionId: string,
+    provider: ProviderConfig,
+    signature: FetchConfigSignature,
+  ): Promise<ModelConfig[]> {
+    // If a fetch is already in progress for this session, wait for it
+    const inProgress = this.draftFetchInProgress.get(sessionId);
+    if (inProgress) {
+      return inProgress;
+    }
+
+    const fetchPromise = this.doFetchForDraft(sessionId, provider, signature);
+    this.draftFetchInProgress.set(sessionId, fetchPromise);
+
+    try {
+      return await fetchPromise;
+    } finally {
+      this.draftFetchInProgress.delete(sessionId);
+    }
+  }
+
+  /**
+   * Actually perform the fetch for a draft session
+   */
+  private async doFetchForDraft(
+    sessionId: string,
+    provider: ProviderConfig,
+    signature: FetchConfigSignature,
+  ): Promise<ModelConfig[]> {
+    // Initialize or get existing session state
+    const session = this.ensureDraftSession(sessionId);
+
+    const configError = this.getProviderConfigError(provider);
+    if (configError) {
+      session.state.lastError = configError;
+      session.state.lastErrorTime = Date.now();
+      session.state.isFetching = false;
+      session.configSignature = signature;
+      this.onDidUpdateEmitter.fire(sessionId);
+      return session.state.models;
+    }
+
+    // Set fetching state and notify
+    session.state.isFetching = true;
+    session.configSignature = signature;
+    this.onDidUpdateEmitter.fire(sessionId);
+
+    try {
+      const resolvedProvider = await this.resolveProvider(provider);
+      const client = createProvider(resolvedProvider);
+
+      if (!client.getAvailableModels) {
+        throw new Error('Provider does not support fetching available models');
+      }
+
+      const rawModels = await client.getAvailableModels();
+      const models = mergeWithWellKnownModels(rawModels);
+
+      session.state.lastFetchTime = Date.now();
+      session.state.models = models;
+      session.state.modelsHash = this.hashModels(models);
+      session.state.lastError = undefined;
+      session.state.lastErrorTime = undefined;
+      session.state.isFetching = false;
+
+      this.onDidUpdateEmitter.fire(sessionId);
+      return models;
+    } catch (error) {
+      const errorMessage =
+        error instanceof Error ? error.message : String(error);
+
+      session.state.lastError = errorMessage;
+      session.state.lastErrorTime = Date.now();
+      session.state.isFetching = false;
+
+      this.onDidUpdateEmitter.fire(sessionId);
+      return session.state.models;
+    }
+  }
+
+  /**
+   * Trigger a refresh for a draft session without blocking
+   */
+  triggerDraftRefresh(
+    sessionId: string,
+    draftInput: OfficialModelsDraftInput,
+  ): void {
+    const session = this.draftSessions.get(sessionId);
+    const draftSignature = this.computeDraftConfigSignature(draftInput);
+    const resolved = this.resolveDraftInput(draftInput);
+
+    if (resolved.kind === 'error') {
+      const target = session ?? this.ensureDraftSession(sessionId);
+      target.configSignature = draftSignature;
+      target.state.lastError = resolved.message;
+      target.state.lastErrorTime = Date.now();
+      target.state.isFetching = false;
+      this.onDidUpdateEmitter.fire(sessionId);
+      return;
+    }
+
+    const provider = resolved.provider;
+    const signature = this.computeConfigSignature(provider);
+    this.fetchForDraft(sessionId, provider, signature);
+  }
+
+  /**
+   * Clear a draft session state
+   */
+  clearDraftSession(sessionId: string): void {
+    this.draftSessions.delete(sessionId);
+  }
+
+  /**
+   * Load persisted provider state into a draft session.
+   * Used when editing an existing provider to preserve cached models.
+   */
+  loadPersistedStateToDraft(
+    sessionId: string,
+    providerName: string,
+    draftInput: OfficialModelsDraftInput,
+  ): boolean {
+    const persistedState = this.state[providerName];
+    if (!persistedState) return false;
+
+    // Don't overwrite existing draft session
+    if (this.draftSessions.has(sessionId)) return false;
+
+    this.draftSessions.set(sessionId, {
+      state: { ...persistedState },
+      configSignature: this.computeDraftConfigSignature(draftInput),
+    });
+    return true;
+  }
+
+  /**
+   * Migrate draft session state to persisted provider state when saving
+   */
+  async migrateDraftToProvider(
+    sessionId: string,
+    providerName: string,
+  ): Promise<void> {
+    const session = this.draftSessions.get(sessionId);
+    if (!session) return;
+
+    // Copy draft state to persisted state
+    this.state[providerName] = { ...session.state };
+    await this.saveState();
+
+    // Clean up draft session
+    this.draftSessions.delete(sessionId);
   }
 
   /**
