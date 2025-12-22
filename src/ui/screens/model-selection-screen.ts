@@ -11,7 +11,6 @@ import { ModelConfig } from '../../types';
 
 type ModelSelectionItem = vscode.QuickPickItem & {
   model?: ModelConfig;
-  action?: 'back';
 };
 
 export async function runModelSelectionScreen(
@@ -36,7 +35,8 @@ async function showModelSelectionPicker(
     qp.canSelectMany = true;
     qp.ignoreFocusOut = true;
     qp.busy = true;
-    qp.items = [{ label: '$(arrow-left) Back', action: 'back' }];
+    qp.buttons = [vscode.QuickInputButtons.Back];
+    qp.items = [];
 
     let resolved = false;
     let isLoading = true;
@@ -55,10 +55,7 @@ async function showModelSelectionPicker(
         qp.placeholder = 'Select models to add';
 
         const existingIds = new Set(route.existingModels.map((m) => m.id));
-        const items: ModelSelectionItem[] = [
-          { label: '$(arrow-left) Back', action: 'back' },
-          { label: '', kind: vscode.QuickPickItemKind.Separator },
-        ];
+        const items: ModelSelectionItem[] = [];
 
         for (const model of models) {
           const alreadyExists = existingIds.has(model.id);
@@ -98,8 +95,6 @@ async function showModelSelectionPicker(
         qp.placeholder = 'Failed to load models';
         qp.canSelectMany = false;
         qp.items = [
-          { label: '$(arrow-left) Back', action: 'back' },
-          { label: '', kind: vscode.QuickPickItemKind.Separator },
           {
             label: '$(error) Failed to load models',
             description: error instanceof Error ? error.message : String(error),
@@ -107,14 +102,15 @@ async function showModelSelectionPicker(
         ];
       });
 
-    qp.onDidAccept(() => {
-      const selectedItems = qp.selectedItems;
-
-      if (selectedItems.some((item) => item.action === 'back')) {
+    qp.onDidTriggerButton((button) => {
+      if (button === vscode.QuickInputButtons.Back) {
         qp.hide();
         finish(undefined);
-        return;
       }
+    });
+
+    qp.onDidAccept(() => {
+      const selectedItems = qp.selectedItems;
 
       if (isLoading || selectedItems.length === 0) {
         return;
@@ -152,13 +148,6 @@ async function showModelSelectionPicker(
 
       qp.hide();
       finish(newModels.length > 0 ? newModels : undefined);
-    });
-
-    qp.onDidChangeSelection((items) => {
-      if (items.some((item) => item.action === 'back')) {
-        qp.hide();
-        finish(undefined);
-      }
     });
 
     qp.onDidHide(() => {

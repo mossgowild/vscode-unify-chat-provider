@@ -100,7 +100,6 @@ type ProviderImportEntry = {
 
 type ProviderImportItem = vscode.QuickPickItem & {
   entryId?: number;
-  action?: 'back';
 };
 
 type ModelImportEntry = {
@@ -110,7 +109,6 @@ type ModelImportEntry = {
 
 type ModelImportItem = vscode.QuickPickItem & {
   entryId?: number;
-  action?: 'back';
 };
 
 const providerImportSchema = {
@@ -439,6 +437,7 @@ async function showProviderImportPicker(options: {
     qp.placeholder = 'Select providers to import';
     qp.canSelectMany = true;
     qp.ignoreFocusOut = true;
+    qp.buttons = [vscode.QuickInputButtons.Back];
 
     let resolved = false;
     const finish = (value: ProviderPickerResult) => {
@@ -449,8 +448,14 @@ async function showProviderImportPicker(options: {
 
     qp.items = buildProviderImportItems(options.entries, options.selectedIds);
 
+    qp.onDidTriggerButton((button) => {
+      if (button === vscode.QuickInputButtons.Back) {
+        finish({ kind: 'back' });
+        qp.hide();
+      }
+    });
+
     qp.onDidTriggerItemButton((event) => {
-      if (event.item.action === 'back') return;
       const entryId = event.item.entryId;
       if (entryId === undefined) return;
 
@@ -466,12 +471,6 @@ async function showProviderImportPicker(options: {
 
     qp.onDidAccept(() => {
       const selectedItems = qp.selectedItems;
-      if (selectedItems.some((item) => item.action === 'back')) {
-        finish({ kind: 'back' });
-        qp.hide();
-        return;
-      }
-
       const selectedIds = new Set(
         selectedItems
           .map((item) => item.entryId)
@@ -509,6 +508,7 @@ async function showModelImportPicker(options: {
     qp.placeholder = 'Select models to import';
     qp.canSelectMany = true;
     qp.ignoreFocusOut = true;
+    qp.buttons = [vscode.QuickInputButtons.Back];
 
     let resolved = false;
     const finish = (value: ModelPickerResult) => {
@@ -519,8 +519,14 @@ async function showModelImportPicker(options: {
 
     qp.items = buildModelImportItems(options.entries, options.selectedIds);
 
+    qp.onDidTriggerButton((button) => {
+      if (button === vscode.QuickInputButtons.Back) {
+        finish({ kind: 'back' });
+        qp.hide();
+      }
+    });
+
     qp.onDidTriggerItemButton((event) => {
-      if (event.item.action === 'back') return;
       const entryId = event.item.entryId;
       if (entryId === undefined) return;
 
@@ -536,12 +542,6 @@ async function showModelImportPicker(options: {
 
     qp.onDidAccept(() => {
       const selectedItems = qp.selectedItems;
-      if (selectedItems.some((item) => item.action === 'back')) {
-        finish({ kind: 'back' });
-        qp.hide();
-        return;
-      }
-
       const selectedIds = new Set(
         selectedItems
           .map((item) => item.entryId)
@@ -567,10 +567,7 @@ function buildProviderImportItems(
   entries: ProviderImportEntry[],
   selectedIds: Set<number>,
 ): ProviderImportItem[] {
-  const items: ProviderImportItem[] = [
-    { label: '$(arrow-left) Back', action: 'back' },
-    { label: '', kind: vscode.QuickPickItemKind.Separator },
-  ];
+  const items: ProviderImportItem[] = [];
 
   for (const entry of entries) {
     const name = getProviderDisplayName(entry.draft, entry.id);
@@ -599,10 +596,7 @@ function buildModelImportItems(
   entries: ModelImportEntry[],
   selectedIds: Set<number>,
 ): ModelImportItem[] {
-  const items: ModelImportItem[] = [
-    { label: '$(arrow-left) Back', action: 'back' },
-    { label: '', kind: vscode.QuickPickItemKind.Separator },
-  ];
+  const items: ModelImportItem[] = [];
 
   for (const entry of entries) {
     const label = getModelDisplayName(entry.model, entry.id);
