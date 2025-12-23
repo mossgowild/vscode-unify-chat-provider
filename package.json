@@ -16,9 +16,16 @@
     "llm",
     "openai",
     "anthropic",
-    "ollama",
     "gemini",
+    "ollama",
     "deepseek",
+    "minimax",
+    "moonshot",
+    "kimi",
+    "glm",
+    "zhipu",
+    "zai",
+    "xiaomimimo",
     "custom-models",
     "自定义模型"
   ],
@@ -469,12 +476,7 @@
     "compile": "tsc -p .",
     "watch": "tsc -watch -p .",
     "count-loc": "bun run scripts/count-loc.ts",
-    "release": "bun run scripts/release.ts",
-    "release:dry": "bun run scripts/release.ts --dry-run",
-    "test:build": "tsc -p tsconfig.tests.json",
-    "test": "npm run test:build && node --test out-tests/test/**/*.test.js",
-    "test:unit": "npm run test:build && node --test out-tests/test/config/*.test.js out-tests/test/client/*.test.js out-tests/test/provider/*.test.js",
-    "test:integration": "npm run test:build && node --test out-tests/test/integration/*.test.js"
+    "release": "bun run scripts/release.ts"
   },
   "devDependencies": {
     "@types/node": "^22",
