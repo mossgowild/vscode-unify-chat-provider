@@ -4,7 +4,6 @@ import { confirmDelete, pickQuickItem, showDeletedMessage } from '../component';
 import {
   ConfigValue,
   duplicateModel,
-  mergePartialProviderConfig,
   promptForConfigValue,
   showCopiedBase64Config,
 } from '../base64-config';
@@ -25,10 +24,11 @@ import type {
   UiResume,
 } from '../router/types';
 import { ModelConfig } from '../../types';
-import { duplicateProvider, exportProviderConfigFromDraft } from '../provider-ops';
 import {
-  deleteProviderApiKeySecretIfUnused,
-} from '../../api-key-utils';
+  duplicateProvider,
+  exportProviderConfigFromDraft,
+} from '../provider-ops';
+import { deleteProviderApiKeySecretIfUnused } from '../../api-key-utils';
 import {
   officialModelsManager,
   OfficialModelsDraftInput,
@@ -321,9 +321,7 @@ export async function runModelListScreen(
             : 'Invalid model configuration array.';
         }
         if (isProviderConfigInput(value)) {
-          return route.draft
-            ? null
-            : 'Provider settings are not available in this context.';
+          return 'Provider configuration is not allowed here.';
         }
         return null;
       },
@@ -342,13 +340,6 @@ export async function runModelListScreen(
       });
       if (!selected) return { kind: 'stay' };
       route.models.push(...selected);
-      return { kind: 'stay' };
-    }
-
-    if (isProviderConfigInput(config)) {
-      if (!route.draft) return { kind: 'stay' };
-      mergePartialProviderConfig(route.draft, config);
-      route.models = route.draft.models;
       return { kind: 'stay' };
     }
 
