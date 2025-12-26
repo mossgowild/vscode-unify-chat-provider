@@ -7,7 +7,7 @@
  * 2) Generate CHANGELOG.md + GitHub Release notes content
  * 3) Show a summary and wait for confirmation
  * 4) Package & publish to VS Code Marketplace (vsce)
- * 5) Upload VSIX to GitHub Release (gh preferred, otherwise GitHub API)
+ * 5) Create GitHub Release, then upload VSIX (gh preferred, otherwise GitHub API)
  *
  * Usage:
  *   bun run scripts/release.ts
@@ -52,6 +52,8 @@ const { values } = parseArgs({
     bump: { type: 'string' },
     'skip-publish': { type: 'boolean' },
     'skip-github': { type: 'boolean' },
+    'skip-github-create': { type: 'boolean' },
+    'skip-github-upload': { type: 'boolean' },
     draft: { type: 'boolean' },
   },
 });
@@ -64,6 +66,8 @@ const providedVersion =
 const providedBump = typeof values.bump === 'string' ? values.bump : undefined;
 const skipPublish = values['skip-publish'] === true;
 const skipGitHub = values['skip-github'] === true;
+const skipGitHubCreate = skipGitHub || values['skip-github-create'] === true;
+const skipGitHubUpload = skipGitHub || values['skip-github-upload'] === true;
 const githubDraft = values.draft === true;
 
 const rl = createInterface({ input: process.stdin, output: process.stdout });
@@ -128,7 +132,8 @@ try {
     baseTag,
     commits,
     skipPublish,
-    skipGitHub,
+    skipGitHubCreate,
+    skipGitHubUpload,
     dryRun,
     changelogTempFile,
   });
@@ -188,7 +193,7 @@ try {
     await runInherit(repoRoot, 'git', ['push', 'origin', tagName]);
   }
 
-  if (!skipGitHub) {
+  if (!skipGitHubCreate || !skipGitHubUpload) {
     await publishGitHubRelease({
       repoRoot,
       tagName,
@@ -197,6 +202,8 @@ try {
       targetCommitish: headSha,
       assetPath: vsixPath,
       draft: githubDraft,
+      skipCreate: skipGitHubCreate,
+      skipUpload: skipGitHubUpload,
     });
   }
 
@@ -511,7 +518,8 @@ function printSummary(params: {
   baseTag: string | null;
   commits: Commit[];
   skipPublish: boolean;
-  skipGitHub: boolean;
+  skipGitHubCreate: boolean;
+  skipGitHubUpload: boolean;
   dryRun: boolean;
   changelogTempFile: string;
 }): void {
@@ -535,9 +543,10 @@ function printSummary(params: {
     }`,
   );
   console.log(
-    `- GitHub:    ${
-      params.skipGitHub ? 'skip' : 'Create Release + upload VSIX'
-    }`,
+    `- GitHub:    ${[
+      params.skipGitHubCreate ? 'create=skip' : 'create=on',
+      params.skipGitHubUpload ? 'upload=skip' : 'upload=on',
+    ].join(', ')}`,
   );
   console.log(`- Mode:      ${params.dryRun ? 'dry-run' : 'live'}`);
   console.log('');
@@ -611,23 +620,64 @@ async function publishGitHubRelease(params: {
   targetCommitish: string;
   assetPath: string;
   draft: boolean;
+  skipCreate: boolean;
+  skipUpload: boolean;
 }): Promise<void> {
+  if (params.skipCreate && params.skipUpload) {
+    return;
+  }
+
   if (await canRun(params.repoRoot, 'gh', ['--version'])) {
     const notesFile = await writeTempNotes(params.notes);
-    const args = [
-      'release',
-      'create',
-      params.tagName,
-      params.assetPath,
-      '--title',
-      params.title,
-      '--notes-file',
-      notesFile,
-    ];
-    if (params.draft) {
-      args.push('--draft');
+
+    if (!params.skipCreate) {
+      const exists = await ghReleaseExists(params.repoRoot, params.tagName);
+      if (exists) {
+        console.log(`GitHub Release already exists: ${params.tagName}`);
+      } else {
+        const args = [
+          'release',
+          'create',
+          params.tagName,
+          '--title',
+          params.title,
+          '--notes-file',
+          notesFile,
+          '--target',
+          params.targetCommitish,
+        ];
+        if (params.draft) {
+          args.push('--draft');
+        }
+        await runInherit(params.repoRoot, 'gh', args);
+      }
     }
-    await runInherit(params.repoRoot, 'gh', args);
+
+    if (!params.skipUpload) {
+      await retry(
+        3,
+        async () => {
+          await runInherit(params.repoRoot, 'gh', [
+            'release',
+            'upload',
+            params.tagName,
+            params.assetPath,
+            '--clobber',
+          ]);
+        },
+        (attempt, error) => {
+          console.warn(
+            `GitHub asset upload failed (attempt ${attempt}/3): ${formatError(
+              error,
+            )}`,
+          );
+          console.warn(
+            `Tip: you can re-run later with --skip-github-create to only upload the VSIX.`,
+          );
+        },
+      );
+    }
+
     return;
   }
 
@@ -641,21 +691,74 @@ async function publishGitHubRelease(params: {
     throw new Error('Unable to determine GitHub repository (owner/repo).');
   }
 
-  const release = await createGitHubRelease({
-    repoSlug,
-    token,
-    tagName: params.tagName,
-    title: params.title,
-    body: params.notes,
-    targetCommitish: params.targetCommitish,
-    draft: params.draft,
-  });
+  let uploadUrlTemplate: string | null = null;
 
-  await uploadGitHubReleaseAsset({
-    uploadUrlTemplate: release.upload_url,
-    token,
-    assetPath: params.assetPath,
-  });
+  if (!params.skipCreate) {
+    const release = await createOrGetGitHubRelease({
+      repoSlug,
+      token,
+      tagName: params.tagName,
+      title: params.title,
+      body: params.notes,
+      targetCommitish: params.targetCommitish,
+      draft: params.draft,
+    });
+    uploadUrlTemplate = release.upload_url;
+  }
+
+  if (!params.skipUpload) {
+    if (!uploadUrlTemplate) {
+      const release = await getGitHubReleaseByTag({
+        repoSlug,
+        token,
+        tagName: params.tagName,
+      });
+      uploadUrlTemplate = release.upload_url;
+    }
+
+    if (!uploadUrlTemplate) {
+      throw new Error('Missing GitHub release upload URL.');
+    }
+
+    await retry(
+      3,
+      async () => {
+        await uploadGitHubReleaseAsset({
+          uploadUrlTemplate,
+          token,
+          assetPath: params.assetPath,
+        });
+      },
+      (attempt, error) => {
+        console.warn(
+          `GitHub asset upload failed (attempt ${attempt}/3): ${formatError(
+            error,
+          )}`,
+        );
+        console.warn(
+          `Tip: you can re-run later with --skip-github-create to only upload the VSIX.`,
+        );
+      },
+    );
+  }
+}
+
+async function ghReleaseExists(
+  repoRoot: string,
+  tagName: string,
+): Promise<boolean> {
+  try {
+    await runCapture(repoRoot, 'gh', [
+      'release',
+      'view',
+      tagName,
+      '--json',
+      'url',
+    ]);
+    return true;
+  } catch {
+    return false;
+  }
 }
 
 async function resolveGitHubRepoSlug(repoRoot: string): Promise<string | null> {
@@ -759,6 +862,91 @@ async function createGitHubRelease(params: {
     throw new Error('Unexpected GitHub release response.');
   }
   return { upload_url: json.upload_url };
+}
+
+async function createOrGetGitHubRelease(params: {
+  repoSlug: string;
+  token: string;
+  tagName: string;
+  title: string;
+  body: string;
+  targetCommitish: string;
+  draft: boolean;
+}): Promise<{ upload_url: string }> {
+  try {
+    return await createGitHubRelease(params);
+  } catch (error) {
+    const message = String(error);
+    if (message.includes('GitHub release create failed (422)')) {
+      return await getGitHubReleaseByTag({
+        repoSlug: params.repoSlug,
+        token: params.token,
+        tagName: params.tagName,
+      });
+    }
+    throw error;
+  }
+}
+
+async function getGitHubReleaseByTag(params: {
+  repoSlug: string;
+  token: string;
+  tagName: string;
+}): Promise<{ upload_url: string }> {
+  const url = `https://api.github.com/repos/${params.repoSlug}/releases/tags/${params.tagName}`;
+  const response = await fetch(url, {
+    method: 'GET',
+    headers: {
+      Authorization: `Bearer ${params.token}`,
+      'Content-Type': 'application/json',
+      Accept: 'application/vnd.github+json',
+      'X-GitHub-Api-Version': '2022-11-28',
+      'User-Agent': 'vscode-unify-chat-provider-release-script',
+    },
+  });
+
+  if (!response.ok) {
+    const text = await safeReadResponseText(response);
+    throw new Error(
+      `GitHub release lookup failed (${response.status}): ${text}`,
+    );
+  }
+
+  const json: unknown = await response.json();
+  if (!isRecord(json) || typeof json.upload_url !== 'string') {
+    throw new Error('Unexpected GitHub release lookup response.');
+  }
+  return { upload_url: json.upload_url };
+}
+
+async function retry(
+  maxAttempts: number,
+  fn: () => Promise<void>,
+  onError?: (attempt: number, error: unknown) => void,
+): Promise<void> {
+  for (let attempt = 1; attempt <= maxAttempts; attempt++) {
+    try {
+      await fn();
+      return;
+    } catch (error) {
+      onError?.(attempt, error);
+      if (attempt >= maxAttempts) {
+        throw error;
+      }
+      await sleep(1000 * attempt);
+    }
+  }
+}
+
+async function sleep(ms: number): Promise<void> {
+  await new Promise<void>((resolve) => setTimeout(resolve, ms));
+}
+
+function formatError(error: unknown): string {
+  if (error instanceof Error) {
+    return error.message;
+  }
+  return String(error);
 }
 
 async function uploadGitHubReleaseAsset(params: {
