@@ -31,6 +31,17 @@ export const WELL_KNOWN_PROVIDERS: ProviderConfig[] = [
     ),
   },
   {
+    name: 'xAI',
+    type: 'openai-responses',
+    baseUrl: 'https://api.x.ai',
+    models: wellKnowns(
+      'grok-4',
+      'grok-4-1-fast-reasoning',
+      'grok-4-1-fast-non-reasoning',
+      'grok-code-fast-1',
+    ),
+  },
+  {
     name: 'Hugging Face (Inference Providers)',
     type: 'openai-chat-completion',
     baseUrl: 'https://router.huggingface.co/v1',

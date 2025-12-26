@@ -107,6 +107,7 @@ Model providers supported for one-click configuration:
 
 - OpenAI
 - Anthropic
+- xAI
 - Hugging Face
 - Alibaba Cloud Model Studio
 - Model Scope

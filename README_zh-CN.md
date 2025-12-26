@@ -107,6 +107,7 @@ Unify Chat Provider
 
 - OpenAI
 - Anthropic
+- xAI
 - Hugging Face
 - 阿里云百炼大模型平台（Alibaba Cloud Model Studio）
 - 魔搭（Model Scope）
