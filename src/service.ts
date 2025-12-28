@@ -72,7 +72,7 @@ export class UnifyChatService implements vscode.LanguageModelChatProvider {
       },
       category: {
         label: provider.name,
-        order: 1,
+        order: 2,
       },
       detail: provider.name,
       tooltip: formatModelDetail(model),
