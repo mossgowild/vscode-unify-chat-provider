@@ -46,6 +46,9 @@
   "repository": "github:smallmain/vscode-unify-chat-provider",
   "bugs": "https://github.com/smallmain/vscode-unify-chat-provider/issues",
   "author": "SmallMain",
+  "sponsor": {
+    "url": "https://github.com/smallmain/sponsors"
+  },
   "license": "MIT",
   "engines": {
     "vscode": "^1.104.0"
