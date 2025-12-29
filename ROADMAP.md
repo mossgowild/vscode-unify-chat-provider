@@ -7,3 +7,8 @@
 - Embedded functionality similar to [CLIProxyAPI](https://github.com/router-for-me/CLIProxyAPI).
 - Context Indicator, official related issue：https://github.com/microsoft/vscode/issues/277871, https://github.com/microsoft/vscode/issues/277414
 - Multilingual support, and update the README_zh-CN.md.
+- Support more apps import:
+  - RooCode
+  - CherryStudio
+- FIM/NES support.
+- Automatic configuration update: It is possible to configure a URL (which will be automatically set when importing from the URL) and a switch. Once the switch is turned on, the latest configuration will be fetched periodically.
