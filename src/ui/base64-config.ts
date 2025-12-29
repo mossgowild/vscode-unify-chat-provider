@@ -21,6 +21,39 @@ function isConfigArray(value: unknown): value is ConfigArrayItem[] {
   return value.every((item) => typeof item === 'string' || isObjectRecord(item));
 }
 
+function isValidHttpUrl(text: string): boolean {
+  try {
+    const url = new URL(text.trim());
+    return url.protocol === 'http:' || url.protocol === 'https:';
+  } catch {
+    return false;
+  }
+}
+
+async function fetchConfigFromUrl(
+  url: string,
+): Promise<{ ok: true; content: string } | { ok: false; error: string }> {
+  try {
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), 10000);
+
+    const response = await fetch(url, { signal: controller.signal });
+    clearTimeout(timeout);
+
+    if (!response.ok) {
+      return { ok: false, error: `HTTP ${response.status}` };
+    }
+
+    const content = await response.text();
+    return { ok: true, content };
+  } catch (error) {
+    if (error instanceof Error && error.name === 'AbortError') {
+      return { ok: false, error: 'Request timeout' };
+    }
+    return { ok: false, error: 'Network error' };
+  }
+}
+
 function decodeConfigStringToValue(
   text: string,
   options?: { allowArray?: boolean },
@@ -291,7 +324,7 @@ export async function promptForConfigValue(options: {
   const inputBox = vscode.window.createInputBox();
   inputBox.title = options.title;
   inputBox.placeholder =
-    options.placeholder ?? 'Paste configuration JSON or Base64 string...';
+    options.placeholder ?? 'Paste URL, JSON, or Base64 configuration...';
   inputBox.ignoreFocusOut = true;
 
   const validateDecoded = (decoded: ConfigValue | undefined): string | null => {
@@ -317,11 +350,19 @@ export async function promptForConfigValue(options: {
     };
 
     inputBox.onDidChangeValue((text) => {
-      if (!text.trim()) {
+      const trimmed = text.trim();
+      if (!trimmed) {
         inputBox.validationMessage = undefined;
         return;
       }
-      const decoded = decodeConfigStringToValue(text.trim(), {
+
+      // URL input: no validation message during typing
+      if (isValidHttpUrl(trimmed)) {
+        inputBox.validationMessage = undefined;
+        return;
+      }
+
+      const decoded = decodeConfigStringToValue(trimmed, {
         allowArray: true,
       });
       if (!decoded) {
@@ -332,10 +373,44 @@ export async function promptForConfigValue(options: {
       }
     });
 
-    inputBox.onDidAccept(() => {
+    inputBox.onDidAccept(async () => {
       const text = inputBox.value.trim();
       if (!text) {
         finish(undefined);
+        inputBox.hide();
+        return;
+      }
+
+      // Handle URL input
+      if (isValidHttpUrl(text)) {
+        inputBox.busy = true;
+        inputBox.enabled = false;
+
+        const result = await fetchConfigFromUrl(text);
+
+        inputBox.busy = false;
+        inputBox.enabled = true;
+
+        if (!result.ok) {
+          inputBox.validationMessage = `Failed to fetch: ${result.error}`;
+          return;
+        }
+
+        const decoded = decodeConfigStringToValue(result.content, {
+          allowArray: true,
+        });
+        if (!decoded) {
+          inputBox.validationMessage = getInvalidConfigMessage(true);
+          return;
+        }
+
+        const validation = validateDecoded(decoded);
+        if (validation) {
+          inputBox.validationMessage = validation;
+          return;
+        }
+
+        finish(decoded);
         inputBox.hide();
         return;
       }
