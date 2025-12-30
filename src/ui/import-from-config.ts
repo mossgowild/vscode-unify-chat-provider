@@ -1,3 +1,4 @@
+import { t } from '../i18n';
 import type { ModelConfig, ProviderConfig } from '../types';
 import { MODEL_CONFIG_KEYS, mergePartialFromRecordByKeys } from '../config-ops';
 import { promptForConfigValue, type ConfigValue } from './base64-config';
@@ -16,18 +17,18 @@ export async function promptForProviderImportConfig(options?: {
   placeholder?: string;
 }): Promise<ProviderImportConfig | undefined> {
   const config = await promptForConfigValue({
-    title: options?.title ?? 'Import Provider From Config',
+    title: options?.title ?? t('Import Provider From Config'),
     placeholder:
-      options?.placeholder ?? 'Paste configuration JSON or Base64 string...',
+      options?.placeholder ?? t('Paste configuration JSON or Base64 string...'),
     validate: (value: ConfigValue) => {
       if (Array.isArray(value)) {
         return parseProviderConfigArray(value)
           ? null
-          : 'Invalid provider configuration array.';
+          : t('Invalid provider configuration array.');
       }
       return isProviderConfigInput(value)
         ? null
-        : 'Invalid provider configuration.';
+        : t('Invalid provider configuration.');
     },
   });
   if (!config) return undefined;
@@ -59,17 +60,17 @@ export async function promptForModelImportConfig(options?: {
   placeholder?: string;
 }): Promise<ModelImportConfig | undefined> {
   const value = await promptForConfigValue({
-    title: options?.title ?? 'Import From Config',
+    title: options?.title ?? t('Import From Config'),
     placeholder:
-      options?.placeholder ?? 'Paste configuration JSON or Base64 string...',
+      options?.placeholder ?? t('Paste configuration JSON or Base64 string...'),
     validate: (input: ConfigValue) => {
       if (Array.isArray(input)) {
         return parseModelConfigArray(input)
           ? null
-          : 'Invalid model configuration array.';
+          : t('Invalid model configuration array.');
       }
       if (isProviderConfigInput(input)) {
-        return 'Provider configuration is not allowed here.';
+        return t('Provider configuration is not allowed here.');
       }
       return null;
     },

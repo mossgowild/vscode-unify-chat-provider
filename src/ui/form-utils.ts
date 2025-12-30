@@ -1,4 +1,5 @@
 import * as vscode from 'vscode';
+import { t } from '../i18n';
 import { ConfigStore } from '../config-store';
 import {
   deepClone,
@@ -154,14 +155,16 @@ export async function confirmDiscardProviderChanges(
   original?: ProviderFormDraft,
 ): Promise<'discard' | 'save' | 'stay'> {
   if (!hasProviderChanges(draft, original)) return 'discard';
+  const discardButton = t('Discard');
+  const saveButton = t('Save');
   const choice = await vscode.window.showWarningMessage(
-    'Discard unsaved provider changes?',
+    t('Discard unsaved provider changes?'),
     { modal: true },
-    'Discard',
-    'Save',
+    discardButton,
+    saveButton,
   );
-  if (choice === 'Discard') return 'discard';
-  if (choice === 'Save') return 'save';
+  if (choice === discardButton) return 'discard';
+  if (choice === saveButton) return 'save';
   return 'stay';
 }
 
@@ -175,14 +178,16 @@ export async function confirmDiscardModelChanges(
   originalId?: string,
 ): Promise<'discard' | 'save' | 'stay'> {
   if (!hasModelChanges(draft, original)) return 'discard';
+  const discardButton = t('Discard');
+  const saveButton = t('Save');
   const choice = await vscode.window.showWarningMessage(
-    'Discard unsaved model changes?',
+    t('Discard unsaved model changes?'),
     { modal: true },
-    'Discard',
-    'Save',
+    discardButton,
+    saveButton,
   );
-  if (choice === 'Discard') return 'discard';
-  if (choice === 'Save') {
+  if (choice === discardButton) return 'discard';
+  if (choice === saveButton) {
     const err = validateModelIdUnique(draft.id, models, originalId);
     if (err) {
       await showValidationErrors([err]);
@@ -199,20 +204,20 @@ export async function confirmDiscardModelChanges(
 export function formatModelDetail(model: ModelConfig): string | undefined {
   const parts: string[] = [];
   if (model.maxInputTokens) {
-    parts.push(`Input: ${model.maxInputTokens.toLocaleString()}`);
+    parts.push(t('Input: {0}', model.maxInputTokens.toLocaleString()));
   }
   if (model.maxOutputTokens) {
-    parts.push(`Output: ${model.maxOutputTokens.toLocaleString()}`);
+    parts.push(t('Output: {0}', model.maxOutputTokens.toLocaleString()));
   }
   if (model.capabilities?.toolCalling) {
     if (typeof model.capabilities.toolCalling === 'number') {
-      parts.push(`Tool (max ${model.capabilities.toolCalling})`);
+      parts.push(t('Tool (max {0})', model.capabilities.toolCalling));
     } else {
-      parts.push('Tool');
+      parts.push(t('Tool'));
     }
   }
   if (model.capabilities?.imageInput) {
-    parts.push('Image');
+    parts.push(t('Image'));
   }
   return parts.length > 0 ? parts.join(' | ') : undefined;
 }
@@ -221,12 +226,12 @@ export function formatModelDetail(model: ModelConfig): string | undefined {
  * Validate a base URL.
  */
 export function validateBaseUrl(url: string): string | null {
-  if (!url.trim()) return 'API base URL is required';
+  if (!url.trim()) return t('API base URL is required');
   try {
     normalizeBaseUrlInput(url);
     return null;
   } catch {
-    return 'Please enter a valid base URL';
+    return t('Please enter a valid base URL');
   }
 }
 
@@ -236,7 +241,7 @@ export function validateBaseUrl(url: string): string | null {
 export function validatePositiveIntegerOrEmpty(s: string): string | null {
   if (!s) return null;
   const n = Number(s);
-  if (Number.isNaN(n) || n <= 0) return 'Please enter a positive number';
+  if (Number.isNaN(n) || n <= 0) return t('Please enter a positive number');
   return null;
 }
 
@@ -249,10 +254,10 @@ export function validateProviderNameUnique(
   originalName?: string,
 ): string | null {
   const trimmed = name.trim();
-  if (!trimmed) return 'Provider name is required';
+  if (!trimmed) return t('Provider name is required');
   if (originalName && trimmed === originalName) return null;
   if (store.getProvider(trimmed))
-    return 'A provider with this name already exists';
+    return t('A provider with this name already exists');
   return null;
 }
 
@@ -265,10 +270,10 @@ export function validateModelIdUnique(
   originalId?: string,
 ): string | null {
   const trimmed = id.trim();
-  if (!trimmed) return 'Model ID is required';
+  if (!trimmed) return t('Model ID is required');
   if (originalId && trimmed === originalId) return null;
   if (models.some((m) => m.id === trimmed))
-    return 'A model with this ID already exists';
+    return t('A model with this ID already exists');
   return null;
 }
 
@@ -290,22 +295,22 @@ export function validateProviderForm(
   options?: ValidateProviderFormOptions,
 ): string[] {
   const errors: string[] = [];
-  if (!data.type) errors.push('API Format is required');
+  if (!data.type) errors.push(t('API Format is required'));
 
   if (options?.skipNameUniquenessCheck) {
     if (!data.name?.trim()) {
-      errors.push('Provider name is required');
+      errors.push(t('Provider name is required'));
     }
   } else {
     const nameErr = data.name
       ? validateProviderNameUnique(data.name, store, originalName)
-      : 'Provider name is required';
+      : t('Provider name is required');
     if (nameErr) errors.push(nameErr);
   }
 
   const urlErr = data.baseUrl
     ? validateBaseUrl(data.baseUrl)
-    : 'API base URL is required';
+    : t('API base URL is required');
   if (urlErr) errors.push(urlErr);
 
   return errors;

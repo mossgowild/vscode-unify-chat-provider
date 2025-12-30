@@ -1,4 +1,5 @@
 import * as vscode from 'vscode';
+import { t } from '../i18n';
 
 export type ImportReviewItem = vscode.QuickPickItem & {
   entryId?: number;
@@ -74,11 +75,11 @@ export async function showImportReviewPicker(options: {
 
 export async function confirmCancelImport(): Promise<boolean> {
   const choice = await vscode.window.showWarningMessage(
-    'Cancel import? Your changes will be lost.',
+    t('Cancel import? Your changes will be lost.'),
     { modal: true },
-    'Cancel Import',
+    t('Cancel Import'),
   );
-  return choice === 'Cancel Import';
+  return choice === t('Cancel Import');
 }
 
 export async function confirmFinalizeImport(options: {
@@ -88,9 +89,9 @@ export async function confirmFinalizeImport(options: {
   const label =
     options.count === 1 ? options.itemLabel : `${options.itemLabel}s`;
   const choice = await vscode.window.showWarningMessage(
-    `Import ${options.count} ${label}?`,
+    t('Import {0} {1}?', options.count, label),
     { modal: true },
-    'Import',
+    t('Import'),
   );
-  return choice === 'Import';
+  return choice === t('Import');
 }

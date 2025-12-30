@@ -1,4 +1,5 @@
 import * as vscode from 'vscode';
+import { t } from '../i18n';
 import { ConfigStore } from '../config-store';
 import type { FormSchema, FieldContext } from './field-schema';
 import {
@@ -30,33 +31,33 @@ export interface ProviderFieldContext extends FieldContext {
  */
 export const providerFormSchema: FormSchema<ProviderFormDraft> = {
   sections: [
-    { id: 'primary', label: 'Primary Fields' },
-    { id: 'content', label: 'Content Fields' },
-    { id: 'others', label: 'Other Fields' },
+    { id: 'primary', label: t('Primary Fields') },
+    { id: 'content', label: t('Content Fields') },
+    { id: 'others', label: t('Other Fields') },
   ],
   fields: [
     // Name field
     {
       key: 'name',
       type: 'text',
-      label: 'Name',
+      label: t('Name'),
       icon: 'tag',
       section: 'primary',
-      prompt: 'Enter a name for this provider',
-      placeholder: 'e.g., My Provider, OpenRouter, Custom',
+      prompt: t('Enter a name for this provider'),
+      placeholder: t('e.g., My Provider, OpenRouter, Custom'),
       required: true,
       validate: (value, _draft, context) => {
         const ctx = context as ProviderFieldContext;
         return validateProviderNameUnique(value, ctx.store, ctx.originalName);
       },
       transform: (value) => value.trim() || undefined,
-      getDescription: (draft) => draft.name || '(required)',
+      getDescription: (draft) => draft.name || t('(required)'),
     },
     // Type field
     {
       key: 'type',
       type: 'custom',
-      label: 'API Format',
+      label: t('API Format'),
       icon: 'symbol-enum',
       section: 'primary',
       edit: async (draft) => {
@@ -64,8 +65,8 @@ export const providerFormSchema: FormSchema<ProviderFormDraft> = {
         const picked = await pickQuickItem<
           vscode.QuickPickItem & { typeValue: ProviderType }
         >({
-          title: 'API Format',
-          placeholder: 'Select the API format',
+          title: t('API Format'),
+          placeholder: t('Select the API format'),
           items: Object.values(PROVIDER_TYPES).map((opt) => ({
             label: opt.label,
             description: opt.description,
@@ -79,31 +80,31 @@ export const providerFormSchema: FormSchema<ProviderFormDraft> = {
       },
       getDescription: (draft) =>
         Object.values(PROVIDER_TYPES).find((o) => o.type === draft.type)
-          ?.label || '(required)',
+          ?.label || t('(required)'),
     },
     // Base URL field
     {
       key: 'baseUrl',
       type: 'text',
-      label: 'API Base URL',
+      label: t('API Base URL'),
       icon: 'globe',
       section: 'primary',
-      prompt: 'Enter the API base URL',
-      placeholder: 'e.g., https://api.example.com',
+      prompt: t('Enter the API base URL'),
+      placeholder: t('e.g., https://api.example.com'),
       required: true,
       validate: (value) => validateBaseUrl(value),
       transform: (value) => normalizeBaseUrlInput(value),
-      getDescription: (draft) => draft.baseUrl || '(required)',
+      getDescription: (draft) => draft.baseUrl || t('(required)'),
     },
     // API Key field
     {
       key: 'apiKey',
       type: 'text',
-      label: 'API Key',
+      label: t('API Key'),
       icon: 'key',
       section: 'primary',
-      prompt: 'Enter your API key',
-      placeholder: 'Leave blank if not required',
+      prompt: t('Enter your API key'),
+      placeholder: t('Leave blank if not required'),
       password: true,
       getValue: (draft, context) => {
         const apiKey = draft.apiKey?.trim() || '';
@@ -123,13 +124,13 @@ export const providerFormSchema: FormSchema<ProviderFormDraft> = {
       transform: (value) => value.trim() || undefined,
       getDescription: (draft, context) => {
         const apiKey = draft.apiKey?.trim() || undefined;
-        if (!apiKey) return '(optional)';
+        if (!apiKey) return t('(optional)');
 
         const ctx = context as ProviderFieldContext | undefined;
         const status = ctx?.apiKeyStatus;
 
         if (status?.kind === 'missing-secret') {
-          return 'Missing (re-enter required)';
+          return t('Missing (re-enter required)');
         }
 
         return '••••••••';
@@ -139,7 +140,7 @@ export const providerFormSchema: FormSchema<ProviderFormDraft> = {
     {
       key: 'models',
       type: 'custom',
-      label: 'Models',
+      label: t('Models'),
       icon: 'symbol-misc',
       section: 'content',
       edit: async (draft, context) => {
@@ -148,28 +149,28 @@ export const providerFormSchema: FormSchema<ProviderFormDraft> = {
       },
       getDescription: (draft) =>
         draft.models.length > 0
-          ? `${draft.models.length} model(s)`
-          : '(optional)',
+          ? t('{0} model(s)', draft.models.length)
+          : t('(optional)'),
       getDetail: (draft) =>
         draft.models.length > 0
           ? draft.models.map((m) => m.name || m.id).join(', ')
-          : '(No models configured)',
+          : t('(No models configured)'),
     },
     // Extra Headers
     {
       key: 'extraHeaders',
       type: 'custom',
-      label: 'Extra Headers',
+      label: t('Extra Headers'),
       icon: 'json',
       section: 'others',
       edit: async () => {
         vscode.window
           .showInformationMessage(
-            'Extra headers must be configured in VS Code settings (JSON).',
-            'Open Settings',
+            t('Extra headers must be configured in VS Code settings (JSON).'),
+            t('Open Settings'),
           )
           .then((choice) => {
-            if (choice === 'Open Settings') {
+            if (choice === t('Open Settings')) {
               vscode.commands.executeCommand(
                 'workbench.action.openSettingsJson',
               );
@@ -178,24 +179,24 @@ export const providerFormSchema: FormSchema<ProviderFormDraft> = {
       },
       getDescription: (draft) =>
         draft.extraHeaders
-          ? `${Object.keys(draft.extraHeaders).length} headers`
-          : 'Not configured',
+          ? t('{0} headers', Object.keys(draft.extraHeaders).length)
+          : t('Not configured'),
     },
     // Extra Body
     {
       key: 'extraBody',
       type: 'custom',
-      label: 'Extra Body',
+      label: t('Extra Body'),
       icon: 'json',
       section: 'others',
       edit: async () => {
         vscode.window
           .showInformationMessage(
-            'Extra body parameters must be configured in VS Code settings (JSON).',
-            'Open Settings',
+            t('Extra body parameters must be configured in VS Code settings (JSON).'),
+            t('Open Settings'),
           )
           .then((choice) => {
-            if (choice === 'Open Settings') {
+            if (choice === t('Open Settings')) {
               vscode.commands.executeCommand(
                 'workbench.action.openSettingsJson',
               );
@@ -204,14 +205,14 @@ export const providerFormSchema: FormSchema<ProviderFormDraft> = {
       },
       getDescription: (draft) =>
         draft.extraBody
-          ? `${Object.keys(draft.extraBody).length} properties`
-          : 'Not configured',
+          ? t('{0} properties', Object.keys(draft.extraBody).length)
+          : t('Not configured'),
     },
     // Timeout
     {
       key: 'timeout',
       type: 'custom',
-      label: 'Network Timeout',
+      label: t('Network Timeout'),
       icon: 'clock',
       section: 'others',
       edit: async (draft, context) => {
@@ -220,14 +221,14 @@ export const providerFormSchema: FormSchema<ProviderFormDraft> = {
       },
       getDescription: (draft) => {
         if (!draft.timeout?.connection && !draft.timeout?.response) {
-          return 'default';
+          return t('default');
         }
         const parts: string[] = [];
         if (draft.timeout?.connection) {
-          parts.push(`conn: ${draft.timeout.connection}ms`);
+          parts.push(t('conn: {0}ms', draft.timeout.connection));
         }
         if (draft.timeout?.response) {
-          parts.push(`resp: ${draft.timeout.response}ms`);
+          parts.push(t('resp: {0}ms', draft.timeout.response));
         }
         return parts.join(', ');
       },

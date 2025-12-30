@@ -19,6 +19,7 @@ import type {
   UiResume,
 } from '../router/types';
 import { promises as fs } from 'fs';
+import { t } from '../../i18n';
 
 type SourcePickItem = vscode.QuickPickItem & {
   sourceId: string;
@@ -56,7 +57,7 @@ export async function runImportProvidersScreen(
   const items = await buildSourceItems();
   if (items.length === 0) {
     vscode.window.showInformationMessage(
-      'No supported applications are available for import yet.',
+      t('No supported applications are available for import yet.'),
     );
     return { kind: 'pop' };
   }
@@ -64,8 +65,8 @@ export async function runImportProvidersScreen(
   let itemAction: SourceItemAction | undefined;
 
   const selection = await pickQuickItem<SourcePickItem>({
-    title: 'Import Providers From Other Applications',
-    placeholder: 'Select an application to import from',
+    title: t('Import Providers From Other Applications'),
+    placeholder: t('Select an application to import from'),
     matchOnDescription: true,
     matchOnDetail: true,
     ignoreFocusOut: false,
@@ -92,7 +93,7 @@ export async function runImportProvidersScreen(
   const source = getProviderMigrationSource(selection.sourceId);
   if (!source) {
     vscode.window.showErrorMessage(
-      `Import source "${selection.sourceId}" not found.`,
+      t('Import source "{0}" not found.', selection.sourceId),
     );
     return { kind: 'stay' };
   }
@@ -118,8 +119,8 @@ async function buildSourceItems(): Promise<SourcePickItem[]> {
     sourceId: source.id,
     detectedPath,
     detail: detectedPath
-      ? `Detected config file: ${detectedPath}`
-      : 'Config file not detected. You can locate it manually.',
+      ? t('Detected config file: {0}', detectedPath)
+      : t('Config file not detected. You can locate it manually.'),
     buttons: [customPathButton, importFromContentButton],
   }));
 }
@@ -129,9 +130,9 @@ async function promptForConfigFilePath(
   defaultValue?: string,
 ): Promise<string | undefined> {
   const inputBox = vscode.window.createInputBox();
-  inputBox.title = 'Import Providers From Other Applications';
-  inputBox.prompt = `Enter ${appName} config file path`;
-  inputBox.placeholder = 'Path to config file...';
+  inputBox.title = t('Import Providers From Other Applications');
+  inputBox.prompt = t('Enter {0} config file path', appName);
+  inputBox.placeholder = t('Path to config file...');
   inputBox.ignoreFocusOut = true;
   inputBox.buttons = [browseButton];
   inputBox.value = defaultValue ?? '';
@@ -151,8 +152,8 @@ async function promptForConfigFilePath(
         canSelectFiles: true,
         canSelectFolders: false,
         canSelectMany: false,
-        openLabel: 'Select config file',
-        title: `Select ${appName} config file`,
+        openLabel: t('Select config file'),
+        title: t('Select {0} config file', appName),
       });
       const uri = selection?.[0];
       if (uri) {
@@ -164,7 +165,7 @@ async function promptForConfigFilePath(
     inputBox.onDidAccept(async () => {
       const rawPath = inputBox.value.trim();
       if (!rawPath) {
-        inputBox.validationMessage = 'Config file path is required';
+        inputBox.validationMessage = t('Config file path is required');
         return;
       }
 
@@ -172,11 +173,11 @@ async function promptForConfigFilePath(
       try {
         const stat = await fs.stat(normalized);
         if (!stat.isFile()) {
-          inputBox.validationMessage = 'Please select a file path';
+          inputBox.validationMessage = t('Please select a file path');
           return;
         }
       } catch {
-        inputBox.validationMessage = 'File not found';
+        inputBox.validationMessage = t('File not found');
         return;
       }
 
@@ -199,9 +200,9 @@ async function promptForConfigContent(
   const clipboardText = await readClipboardText();
 
   const inputBox = vscode.window.createInputBox();
-  inputBox.title = 'Import Providers From Other Applications';
-  inputBox.prompt = `Paste ${appName} config content`;
-  inputBox.placeholder = 'Configuration content...';
+  inputBox.title = t('Import Providers From Other Applications');
+  inputBox.prompt = t('Paste {0} config content', appName);
+  inputBox.placeholder = t('Configuration content...');
   inputBox.ignoreFocusOut = true;
 
   if (clipboardText) {
@@ -219,7 +220,7 @@ async function promptForConfigContent(
 
     inputBox.onDidChangeValue((text) => {
       if (!text.trim()) {
-        inputBox.validationMessage = 'Config content is required';
+        inputBox.validationMessage = t('Config content is required');
       } else {
         inputBox.validationMessage = undefined;
       }
@@ -228,7 +229,7 @@ async function promptForConfigContent(
     inputBox.onDidAccept(() => {
       const rawContent = inputBox.value.trim();
       if (!rawContent) {
-        inputBox.validationMessage = 'Config content is required';
+        inputBox.validationMessage = t('Config content is required');
         return;
       }
 
@@ -264,14 +265,14 @@ async function pickCandidateInitialConfig(
   const items: CandidatePickItem[] = candidates.map((candidate, index) => {
     const provider = candidate.provider;
     return {
-      label: provider.name || `Provider ${index + 1}`,
+      label: provider.name || t('Provider {0}', index + 1),
       initialConfig: provider,
     };
   });
 
   const selection = await pickQuickItem<CandidatePickItem>({
-    title: `Import ${candidates.length} Providers`,
-    placeholder: 'Select a provider to review before saving',
+    title: t('Import {0} Providers', candidates.length),
+    placeholder: t('Select a provider to review before saving'),
     ignoreFocusOut: false,
     items,
   });
@@ -286,7 +287,7 @@ async function handleSourceItemAction(
   const source = getProviderMigrationSource(action.item.sourceId);
   if (!source) {
     vscode.window.showErrorMessage(
-      `Import source "${action.item.sourceId}" not found.`,
+      t('Import source "{0}" not found.', action.item.sourceId),
     );
     return { kind: 'stay' };
   }
@@ -316,7 +317,7 @@ async function importProvidersFromContent(
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);
     vscode.window.showErrorMessage(
-      `Failed to import from ${source.displayName}: ${message}`,
+      t('Failed to import from {0}: {1}', source.displayName, message),
       { modal: true },
     );
     return { kind: 'stay' };
@@ -337,7 +338,7 @@ async function importProvidersFromPath(
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);
     vscode.window.showErrorMessage(
-      `Failed to import from ${source.displayName}: ${message}`,
+      t('Failed to import from {0}: {1}', source.displayName, message),
       { modal: true },
     );
     return { kind: 'stay' };
@@ -351,7 +352,7 @@ async function handleImportCandidates(
 ): Promise<UiNavAction> {
   if (candidates.length === 0) {
     vscode.window.showErrorMessage(
-      `No providers found in ${sourceName} configuration.`,
+      t('No providers found in {0} configuration.', sourceName),
     );
     return { kind: 'stay' };
   }
@@ -362,10 +363,10 @@ async function handleImportCandidates(
   const suggestedName = (initialConfig.name ?? sourceName).trim();
   if (validateProviderNameUnique(suggestedName, ctx.store) !== null) {
     const name = await showInput({
-      title: 'Provider Name',
-      prompt: 'Enter a name for this provider',
+      title: t('Provider Name'),
+      prompt: t('Enter a name for this provider'),
       value: suggestedName,
-      placeHolder: 'e.g., My Provider, OpenRouter, Custom',
+      placeHolder: t('e.g., My Provider, OpenRouter, Custom'),
       ignoreFocusOut: true,
       showBackButton: true,
       validateInput: (value) => validateProviderNameUnique(value, ctx.store),

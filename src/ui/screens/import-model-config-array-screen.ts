@@ -22,6 +22,7 @@ import {
   promptConflictResolution,
   generateUniqueModelIdAndName,
 } from '../conflict-resolution';
+import { t } from '../../i18n';
 
 const editButton: vscode.QuickInputButton = {
   iconPath: new vscode.ThemeIcon('edit'),
@@ -31,7 +32,7 @@ const editButton: vscode.QuickInputButton = {
 function getModelDisplayName(model: ModelConfig, fallbackIndex: number): string {
   if (model.name?.trim()) return model.name.trim();
   if (model.id?.trim()) return model.id.trim();
-  return `Model ${fallbackIndex + 1}`;
+  return t('Model {0}', fallbackIndex + 1);
 }
 
 function buildModelImportItems(
@@ -78,18 +79,18 @@ function validateSelectedModels(options: {
     );
 
   if (selected.length === 0) {
-    return ['Select at least one model to import.'];
+    return [t('Select at least one model to import.')];
   }
 
   const ids = selected.map(({ model }) => model.id?.trim() ?? '');
   if (ids.some((id) => !id)) {
-    return ['Some models are missing IDs. Please edit them first.'];
+    return [t('Some models are missing IDs. Please edit them first.')];
   }
 
   // Check for duplicates within imported configs (invalid config error)
   const duplicates = findDuplicates(ids);
   if (duplicates.length > 0) {
-    return [`Model ID conflicts: ${duplicates.join(', ')}`];
+    return [t('Model ID conflicts: {0}', duplicates.join(', '))];
   }
 
   return [];
@@ -156,13 +157,13 @@ export async function runImportModelConfigArrayScreen(
   }
 
   if (route.models.length === 0) {
-    vscode.window.showInformationMessage('No models found to import.');
+    vscode.window.showInformationMessage(t('No models found to import.'));
     return { kind: 'pop' };
   }
 
   const pickerResult = await showImportReviewPicker({
-    title: 'Import Models From Config',
-    placeholder: 'Select models to import',
+    title: t('Import Models From Config'),
+    placeholder: t('Select models to import'),
     items: buildModelImportItems(route.models, route.selectedIds),
   });
 
@@ -176,7 +177,7 @@ export async function runImportModelConfigArrayScreen(
   if (pickerResult.kind === 'edit') {
     const model = route.models[pickerResult.entryId];
     if (!model) {
-      vscode.window.showErrorMessage('Model not found.');
+      vscode.window.showErrorMessage(t('Model not found.'));
       return { kind: 'stay' };
     }
 

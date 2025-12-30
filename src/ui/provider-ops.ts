@@ -1,4 +1,5 @@
 import * as vscode from 'vscode';
+import { t } from '../i18n';
 import { ConfigStore } from '../config-store';
 import {
   deepClone,
@@ -169,8 +170,8 @@ export async function saveProviderDraft(options: {
 
   vscode.window.showInformationMessage(
     options.existing || existingToOverwrite
-      ? `Provider "${provider.name}" updated.`
-      : `Provider "${provider.name}" added.`,
+      ? t('Provider "{0}" updated.', provider.name)
+      : t('Provider "{0}" added.', provider.name),
   );
   return 'saved';
 }
@@ -195,7 +196,7 @@ export async function duplicateProvider(
   const ok = await resolveApiKeyForExportOrShowError(
     apiKeyStore,
     duplicated,
-    `Provider "${provider.name}" API key is missing. Please re-enter it before duplicating.`,
+    t('Provider "{0}" API key is missing. Please re-enter it before duplicating.', provider.name),
   );
   if (!ok) return;
 
@@ -210,7 +211,7 @@ export async function duplicateProvider(
   }
 
   await store.upsertProvider(duplicated);
-  vscode.window.showInformationMessage(`Provider duplicated as "${newName}".`);
+  vscode.window.showInformationMessage(t('Provider duplicated as "{0}".', newName));
 }
 
 export function buildProviderConfigFromDraft(
@@ -238,20 +239,20 @@ async function promptForProviderExportSections(): Promise<
     const qp = vscode.window.createQuickPick<
       vscode.QuickPickItem & { section: ProviderExportSection }
     >();
-    qp.title = 'Export Provider Configuration';
-    qp.placeholder = 'Select what to export';
+    qp.title = t('Export Provider Configuration');
+    qp.placeholder = t('Select what to export');
     qp.canSelectMany = true;
     qp.ignoreFocusOut = true;
     qp.items = [
       {
-        label: 'Models',
-        detail: 'Export model configuration array',
+        label: t('Models'),
+        detail: t('Export model configuration array'),
         section: 'models',
         picked: true,
       },
       {
-        label: 'Settings',
-        detail: 'Export provider settings without models',
+        label: t('Settings'),
+        detail: t('Export provider settings without models'),
         section: 'settings',
         picked: true,
       },
@@ -268,7 +269,7 @@ async function promptForProviderExportSections(): Promise<
     qp.onDidAccept(() => {
       const sections = new Set(qp.selectedItems.map((item) => item.section));
       if (sections.size === 0) {
-        vscode.window.showErrorMessage('Select at least one export option.', {
+        vscode.window.showErrorMessage(t('Select at least one export option.'), {
           modal: true,
         });
         return;

@@ -1,4 +1,5 @@
 import * as vscode from 'vscode';
+import { t } from '../i18n';
 
 /**
  * Base field definition shared by all field types.
@@ -171,11 +172,11 @@ export function buildFormItems<T>(
     isEditing,
     hasConfirm = true,
     hasExport = true,
-    backLabel = '$(arrow-left) Back',
-    saveLabel = '$(check) Save',
-    deleteLabel = '$(trash) Delete',
-    exportLabel = '$(export) Export',
-    duplicateLabel = '$(files) Duplicate',
+    backLabel = t('$(arrow-left) Back'),
+    saveLabel = t('$(check) Save'),
+    deleteLabel = t('$(trash) Delete'),
+    exportLabel = t('$(export) Export'),
+    duplicateLabel = t('$(files) Duplicate'),
   } = options;
   const items: FormItem<T>[] = [];
 
@@ -284,19 +285,19 @@ function getFieldDescription<T>(
         ? field.getValue(draft, context)
         : (draft[field.key] as string | undefined);
       if (field.password && value) return '••••••••';
-      return value || (field.required ? '(required)' : '(optional)');
+      return value || (field.required ? t('(required)') : t('(optional)'));
     }
     case 'number': {
       const value = field.getValue
         ? field.getValue(draft)
         : (draft[field.key] as number | undefined);
-      return value !== undefined ? value.toLocaleString() : 'default';
+      return value !== undefined ? value.toLocaleString() : t('default');
     }
     case 'picker': {
       const value = field.getValue ? field.getValue(draft) : draft[field.key];
       const options = typeof field.options === 'function' ? [] : field.options;
       const option = options.find((o) => o.value === value);
-      return option?.label || 'default';
+      return option?.label || t('default');
     }
     case 'custom':
       return '';

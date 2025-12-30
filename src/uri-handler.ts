@@ -14,6 +14,7 @@ import {
   isProviderConfigInput,
   parseProviderConfigArray,
 } from './ui/import-config';
+import { t } from './i18n';
 
 const IMPORT_CONFIG_PATH = '/import-config';
 
@@ -99,7 +100,7 @@ export class ImportConfigUriHandler implements vscode.UriHandler {
 
     if (!configParam) {
       vscode.window.showErrorMessage(
-        'Missing "config" parameter in import URI.',
+        t('Missing "config" parameter in import URI.'),
       );
       return;
     }
@@ -108,7 +109,7 @@ export class ImportConfigUriHandler implements vscode.UriHandler {
     const configValue = await vscode.window.withProgress(
       {
         location: vscode.ProgressLocation.Notification,
-        title: 'Importing configuration...',
+        title: t('Importing configuration...'),
         cancellable: false,
       },
       () => decodeConfigParam(configParam),
@@ -116,7 +117,7 @@ export class ImportConfigUriHandler implements vscode.UriHandler {
 
     if (!configValue) {
       vscode.window.showErrorMessage(
-        'Invalid configuration. Must be a valid JSON, Base64-encoded JSON, or URL pointing to a configuration.',
+        t('Invalid configuration. Must be a valid JSON, Base64-encoded JSON, or URL pointing to a configuration.'),
       );
       return;
     }
@@ -132,7 +133,7 @@ export class ImportConfigUriHandler implements vscode.UriHandler {
     if (Array.isArray(configValue)) {
       const configs = parseProviderConfigArray(configValue);
       if (!configs) {
-        vscode.window.showErrorMessage('Invalid provider configuration array.');
+        vscode.window.showErrorMessage(t('Invalid provider configuration array.'));
         return;
       }
 
@@ -150,7 +151,7 @@ export class ImportConfigUriHandler implements vscode.UriHandler {
 
     // Handle single config
     if (!isProviderConfigInput(configValue)) {
-      vscode.window.showErrorMessage('Invalid provider configuration.');
+      vscode.window.showErrorMessage(t('Invalid provider configuration.'));
       return;
     }
 

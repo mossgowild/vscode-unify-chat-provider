@@ -17,6 +17,7 @@ import {
 } from './ui';
 import { officialModelsManager } from './official-models-manager';
 import { registerUriHandler } from './uri-handler';
+import { t } from './i18n';
 
 const VENDOR_ID = 'unify-chat-provider';
 const CONFIG_NAMESPACE = 'unifyChatProvider';
@@ -109,14 +110,14 @@ export function registerCommands(
         ).length;
         if (enabledCount === 0) {
           vscode.window.showInformationMessage(
-            'No providers have auto-fetch official models enabled.',
+            t('No providers have auto-fetch official models enabled.'),
           );
           return;
         }
         await vscode.window.withProgress(
           {
             location: vscode.ProgressLocation.Notification,
-            title: 'Refreshing official models...',
+            title: t('Refreshing official models...'),
             cancellable: false,
           },
           async () => {
@@ -124,7 +125,7 @@ export function registerCommands(
           },
         );
         vscode.window.showInformationMessage(
-          `Refreshed official models for ${enabledCount} provider(s).`,
+          t('Refreshed official models for {0} provider(s).', enabledCount),
         );
       },
     ),
@@ -147,7 +148,7 @@ function enqueueMaintenance(work: () => Promise<void>): void {
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error);
       vscode.window.showErrorMessage(
-        `Failed to maintain API key storage: ${message}`,
+        t('Failed to maintain API key storage: {0}', message),
         { modal: true },
       );
     }
@@ -281,7 +282,7 @@ async function migrateApiKeyStorage(options: {
     await vscode.window.withProgress(
       {
         location: vscode.ProgressLocation.Notification,
-        title: 'Migrating API key storage...',
+        title: t('Migrating API key storage...'),
         cancellable: false,
       },
       work,

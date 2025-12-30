@@ -1,4 +1,5 @@
 import * as vscode from 'vscode';
+import { t } from '../i18n';
 import { generateAutoVersionedId } from '../model-id-utils';
 import {
   deepClone,
@@ -89,9 +90,9 @@ export function decodeConfigStringToValue(
 
 function getInvalidConfigMessage(allowArray: boolean): string {
   if (allowArray) {
-    return 'Invalid configuration. Paste a JSON object or array, or a Base64/Base64-URL encoded JSON object or array.';
+    return t('Invalid configuration. Paste a JSON object or array, or a Base64/Base64-URL encoded JSON object or array.');
   }
-  return 'Invalid configuration. Paste a JSON object or a Base64/Base64-URL encoded JSON object.';
+  return t('Invalid configuration. Paste a JSON object or a Base64/Base64-URL encoded JSON object.');
 }
 
 /**
@@ -251,7 +252,7 @@ export async function promptForBase64Config<
   const inputBox = vscode.window.createInputBox();
   inputBox.title = options.title;
   inputBox.placeholder =
-    options.placeholder ?? 'Paste configuration JSON or Base64 string...';
+    options.placeholder ?? t('Paste configuration JSON or Base64 string...');
   inputBox.ignoreFocusOut = true;
 
   // Pre-fill with clipboard if valid
@@ -324,7 +325,7 @@ export async function promptForConfigValue(options: {
   const inputBox = vscode.window.createInputBox();
   inputBox.title = options.title;
   inputBox.placeholder =
-    options.placeholder ?? 'Paste URL, JSON, or Base64 configuration...';
+    options.placeholder ?? t('Paste URL, JSON, or Base64 configuration...');
   inputBox.ignoreFocusOut = true;
 
   const validateDecoded = (decoded: ConfigValue | undefined): string | null => {
@@ -392,7 +393,7 @@ export async function promptForConfigValue(options: {
         inputBox.enabled = true;
 
         if (!result.ok) {
-          inputBox.validationMessage = `Failed to fetch: ${result.error}`;
+          inputBox.validationMessage = t('Failed to fetch: {0}', result.error);
           return;
         }
 
@@ -447,12 +448,12 @@ export async function showCopiedBase64Config(config: object): Promise<void> {
   const base64 = encodeConfigToBase64(config);
   await vscode.env.clipboard.writeText(base64);
   vscode.window.showInformationMessage(
-    'Configuration string has been exported to clipboard.',
+    t('Configuration string has been exported to clipboard.'),
   );
 
   const inputBox = vscode.window.createInputBox();
-  inputBox.title = 'Base64 Configuration';
-  inputBox.prompt = 'You can copy and share this exported configuration string.';
+  inputBox.title = t('Base64 Configuration');
+  inputBox.prompt = t('You can copy and share this exported configuration string.');
   inputBox.value = base64;
   inputBox.ignoreFocusOut = false;
 

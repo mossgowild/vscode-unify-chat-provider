@@ -21,6 +21,7 @@ import {
   promptConflictResolution,
   generateUniqueProviderName,
 } from '../conflict-resolution';
+import { t } from '../../i18n';
 
 const editButton: vscode.QuickInputButton = {
   iconPath: new vscode.ThemeIcon('edit'),
@@ -33,7 +34,7 @@ function getProviderDisplayName(
 ): string {
   const name = draft.name?.trim();
   if (name) return name;
-  return `Provider ${fallbackIndex + 1}`;
+  return t('Provider {0}', fallbackIndex + 1);
 }
 
 function buildProviderImportItems(
@@ -46,7 +47,7 @@ function buildProviderImportItems(
       .map((m) => m.name || m.id)
       .filter((value): value is string => !!value);
     const detail =
-      modelNames.length > 0 ? `Models: ${modelNames.join(', ')}` : 'No models';
+      modelNames.length > 0 ? t('Models: {0}', modelNames.join(', ')) : t('No models');
 
     return {
       label: name,
@@ -90,20 +91,20 @@ function validateSelectedProviders(options: {
     );
 
   if (selected.length === 0) {
-    return ['Select at least one provider to import.'];
+    return [t('Select at least one provider to import.')];
   }
 
   const errors: string[] = [];
 
   const names = selected.map(({ draft }) => draft.name?.trim() ?? '');
   if (names.some((name) => !name)) {
-    errors.push('Some providers are missing names. Please edit them first.');
+    errors.push(t('Some providers are missing names. Please edit them first.'));
   }
 
   // Check for duplicates within imported configs (invalid config error)
   const duplicates = findDuplicates(names.filter((name) => !!name));
   if (duplicates.length > 0) {
-    errors.push(`Provider name conflicts: ${duplicates.join(', ')}`);
+    errors.push(t('Provider name conflicts: {0}', duplicates.join(', ')));
   }
 
   // Validate each provider, but skip name uniqueness check (handled separately)
@@ -114,7 +115,7 @@ function validateSelectedProviders(options: {
     if (providerErrors.length > 0) {
       const displayName = getProviderDisplayName(draft, id);
       for (const err of providerErrors) {
-        errors.push(`${displayName}: ${err}`);
+        errors.push(t('{0}: {1}', displayName, err));
       }
     }
   }
@@ -166,7 +167,7 @@ export async function runImportProviderConfigArrayScreen(
   }
   const drafts = route.drafts;
   if (drafts.length === 0) {
-    vscode.window.showInformationMessage('No providers found to import.');
+    vscode.window.showInformationMessage(t('No providers found to import.'));
     return { kind: 'pop' };
   }
   if (!route.selectedIds) {
@@ -174,8 +175,8 @@ export async function runImportProviderConfigArrayScreen(
   }
 
   const pickerResult = await showImportReviewPicker({
-    title: 'Import Providers From Config',
-    placeholder: 'Select providers to import',
+    title: t('Import Providers From Config'),
+    placeholder: t('Select providers to import'),
     items: buildProviderImportItems(drafts, route.selectedIds),
   });
 
@@ -197,7 +198,7 @@ export async function runImportProviderConfigArrayScreen(
   if (pickerResult.kind === 'edit') {
     const draft = drafts[pickerResult.entryId];
     if (!draft) {
-      vscode.window.showErrorMessage('Provider not found.');
+      vscode.window.showErrorMessage(t('Provider not found.'));
       return { kind: 'stay' };
     }
 

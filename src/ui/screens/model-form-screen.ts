@@ -23,6 +23,7 @@ import type {
   UiResume,
 } from '../router/types';
 import { ModelConfig } from '../../types';
+import { t } from '../../i18n';
 
 export async function runModelFormScreen(
   _ctx: UiContext,
@@ -53,10 +54,10 @@ export async function runModelFormScreen(
   const selection = await pickQuickItem<FormItem<ModelConfig>>({
     title: route.model
       ? isImportMode
-        ? `Edit Model (${route.model.name || route.model.id})${providerSuffix}`
-        : `Model: ${route.model.name || route.model.id}${providerSuffix}`
-      : `Add Model${providerSuffix}`,
-    placeholder: 'Select a field to edit',
+        ? t('Edit Model ({0}){1}', route.model.name || route.model.id, providerSuffix)
+        : t('Model: {0}{1}', route.model.name || route.model.id, providerSuffix)
+      : t('Add Model{0}', providerSuffix),
+    placeholder: t('Select a field to edit'),
     ignoreFocusOut: true,
     items: buildFormItems(
       modelFormSchema,
@@ -64,8 +65,8 @@ export async function runModelFormScreen(
       {
         isEditing: !isImportMode && !!route.model,
         hasExport: !isImportMode,
-        backLabel: '$(arrow-left) Back',
-        saveLabel: isImportMode ? '$(check) Done' : '$(check) Save',
+        backLabel: `$(arrow-left) ${t('Back')}`,
+        saveLabel: isImportMode ? `$(check) ${t('Done')}` : `$(check) ${t('Save')}`,
       },
       context,
     ),
@@ -115,7 +116,7 @@ export async function runModelFormScreen(
     const duplicated = duplicateModel(route.model, route.models);
     route.models.push(duplicated);
     vscode.window.showInformationMessage(
-      `Model duplicated as "${duplicated.id}".`,
+      t('Model duplicated as "{0}".', duplicated.id),
     );
     return { kind: 'stay' };
   }
@@ -171,10 +172,8 @@ export async function runModelViewScreen(
   );
 
   const selection = await pickQuickItem<FormItem<ModelConfig>>({
-    title: `Model: ${
-      route.model.name || route.model.id
-    }${providerSuffix} (Read-Only)`,
-    placeholder: 'Select a field to view',
+    title: t('Model: {0}{1} (Read-Only)', route.model.name || route.model.id, providerSuffix),
+    placeholder: t('Select a field to view'),
     ignoreFocusOut: true,
     items: readOnlyItems,
   });

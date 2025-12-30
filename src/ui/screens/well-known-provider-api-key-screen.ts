@@ -6,6 +6,7 @@ import type {
   UiResume,
   WellKnownProviderApiKeyRoute,
 } from '../router/types';
+import { t } from '../../i18n';
 
 export async function runWellKnownProviderApiKeyScreen(
   ctx: UiContext,
@@ -13,8 +14,8 @@ export async function runWellKnownProviderApiKeyScreen(
   _resume: UiResume | undefined,
 ): Promise<UiNavAction> {
   const apiKey = await showInput({
-    title: 'API Key',
-    prompt: 'Enter your API key',
+    title: t('API Key'),
+    prompt: t('Enter your API key'),
     value: route.draft.apiKey,
     password: true,
     ignoreFocusOut: true,

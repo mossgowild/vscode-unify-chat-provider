@@ -25,6 +25,7 @@ import {
   saveProviderDraft,
 } from '../provider-ops';
 import { deleteProviderApiKeySecretIfUnused } from '../../api-key-utils';
+import { t } from '../../i18n';
 
 const providerSettingsSchema = {
   ...providerFormSchema,
@@ -70,12 +71,12 @@ export async function runProviderFormScreen(
   const selection = await pickQuickItem<FormItem<ProviderFormDraft>>({
     title: isSettings
       ? existing
-        ? `Provider Settings (${existing.name})`
-        : 'Provider Settings'
+        ? t('Provider Settings ({0})', existing.name)
+        : t('Provider Settings')
       : existing
-      ? 'Edit Provider'
-      : 'Add Provider',
-    placeholder: 'Select a field to edit',
+      ? t('Edit Provider')
+      : t('Add Provider'),
+    placeholder: t('Select a field to edit'),
     ignoreFocusOut: true,
     items,
   });
@@ -148,7 +149,7 @@ export async function runProviderFormScreen(
           kind: 'modelList',
           invocation: 'addProvider',
           models: draft.models,
-          providerLabel: draft.name ?? originalName ?? 'Provider',
+          providerLabel: draft.name ?? originalName ?? t('Provider'),
           requireAtLeastOne: false,
           draft,
         },
@@ -186,7 +187,7 @@ async function ensureInitialized(
   const providerName = route.providerName;
   const existing = providerName ? store.getProvider(providerName) : undefined;
   if (providerName && !existing) {
-    vscode.window.showErrorMessage(`Provider "${providerName}" not found.`);
+    vscode.window.showErrorMessage(t('Provider "{0}" not found.', providerName));
     return;
   }
 

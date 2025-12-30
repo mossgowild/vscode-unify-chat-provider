@@ -1,4 +1,5 @@
 import * as vscode from 'vscode';
+import { t } from '../i18n';
 import { DEFAULT_MAX_OUTPUT_TOKENS } from '../defaults';
 import type { FieldContext, FormSchema } from './field-schema';
 import { booleanOptions, formatBoolean } from './field-editors';
@@ -29,21 +30,21 @@ export interface ModelFieldContext extends FieldContext {
  */
 export const modelFormSchema: FormSchema<ModelConfig> = {
   sections: [
-    { id: 'primary', label: 'Primary Fields' },
-    { id: 'details', label: 'Detailed Fields' },
-    { id: 'capabilities', label: 'Capabilities' },
-    { id: 'parameters', label: 'Parameters' },
-    { id: 'others', label: 'others' },
+    { id: 'primary', label: t('Primary Fields') },
+    { id: 'details', label: t('Detailed Fields') },
+    { id: 'capabilities', label: t('Capabilities') },
+    { id: 'parameters', label: t('Parameters') },
+    { id: 'others', label: t('others') },
   ],
   fields: [
     {
       key: 'id',
       type: 'text',
-      label: 'Model ID',
+      label: t('Model ID'),
       icon: 'tag',
       section: 'primary',
-      prompt: 'Enter the model ID',
-      placeholder: 'e.g., claude-sonnet-4-20250514',
+      prompt: t('Enter the model ID'),
+      placeholder: t('e.g., claude-sonnet-4-20250514'),
       required: true,
       validate: (input, _draft, context) => {
         const ctx = context as ModelFieldContext;
@@ -55,7 +56,7 @@ export const modelFormSchema: FormSchema<ModelConfig> = {
           }
         }
         if (trimmed.endsWith(MODEL_VERSION_DELIMITER)) {
-          return `Model ID cannot end with '${MODEL_VERSION_DELIMITER}'`;
+          return t("Model ID cannot end with '{0}'", MODEL_VERSION_DELIMITER);
         }
         return null;
       },
@@ -73,12 +74,12 @@ export const modelFormSchema: FormSchema<ModelConfig> = {
               ctx.models,
             );
             const choice = await vscode.window.showWarningMessage(
-              `A model with the ID '${trimmed}' already exists.\nWould you like to add a version suffix to '${autoVersionedId}'?`,
+              t("A model with the ID '{0}' already exists.\nWould you like to add a version suffix to '{1}'?", trimmed, autoVersionedId),
               { modal: true },
-              'Yes',
+              t('Yes'),
             );
 
-            if (choice === 'Yes') {
+            if (choice === t('Yes')) {
               return { value: autoVersionedId };
             }
             // If cancelled, keep input open
@@ -88,45 +89,45 @@ export const modelFormSchema: FormSchema<ModelConfig> = {
         return true;
       },
       transform: (value) => value.trim() || undefined,
-      getDescription: (draft) => draft.id || '(required)',
+      getDescription: (draft) => draft.id || t('(required)'),
     },
     // Name field
     {
       key: 'name',
       type: 'text',
-      label: 'Display Name',
+      label: t('Display Name'),
       icon: 'symbol-text',
       section: 'primary',
-      prompt: 'Enter display name (leave blank to use model ID)',
-      placeholder: 'e.g., Claude Sonnet 4',
+      prompt: t('Enter display name (leave blank to use model ID)'),
+      placeholder: t('e.g., Claude Sonnet 4'),
       transform: (value) => value.trim() || undefined,
-      getDescription: (draft) => draft.name || '(optional)',
+      getDescription: (draft) => draft.name || t('(optional)'),
     },
     // Family field
     {
       key: 'family',
       type: 'text',
-      label: 'Model Family',
+      label: t('Model Family'),
       icon: 'preserve-case',
       section: 'primary',
-      prompt: 'Enter model family (leave blank to use model ID)',
-      placeholder: 'e.g., gpt-4, claude-3',
+      prompt: t('Enter model family (leave blank to use model ID)'),
+      placeholder: t('e.g., gpt-4, claude-3'),
       transform: (value) => value.trim() || undefined,
-      getDescription: (draft) => draft.family || '(optional)',
+      getDescription: (draft) => draft.family || t('(optional)'),
     },
     // Max Input Tokens
     {
       key: 'maxInputTokens',
       type: 'number',
-      label: 'Max Input/Context Tokens',
+      label: t('Max Input/Context Tokens'),
       icon: 'arrow-down',
       section: 'details',
       prompt: (_draft, context) => {
         const providerType = (context as ModelFieldContext).providerType;
-        if (!providerType) return 'Enter max input/context tokens';
-        return 'Enter max input/context tokens (leave blank to let the provider decide)';
+        if (!providerType) return t('Enter max input/context tokens');
+        return t('Enter max input/context tokens (leave blank to let the provider decide)');
       },
-      placeholder: 'Leave blank for default',
+      placeholder: t('Leave blank for default'),
       positiveInteger: true,
       getDescription: (draft, context) => {
         if (draft.maxInputTokens !== undefined) {
@@ -135,25 +136,25 @@ export const modelFormSchema: FormSchema<ModelConfig> = {
         const providerType = (context as ModelFieldContext | undefined)
           ?.providerType;
         if (!providerType) return undefined;
-        return 'provider decides';
+        return t('provider decides');
       },
     },
     // Max Output Tokens
     {
       key: 'maxOutputTokens',
       type: 'number',
-      label: 'Max Output Tokens',
+      label: t('Max Output Tokens'),
       icon: 'arrow-up',
       section: 'details',
       prompt: (_draft, context) => {
         const providerType = (context as ModelFieldContext).providerType;
-        if (!providerType) return 'Enter max output tokens';
+        if (!providerType) return t('Enter max output tokens');
         if (providerType === 'anthropic') {
-          return `Enter max output tokens (leave blank to send default: ${DEFAULT_MAX_OUTPUT_TOKENS.toLocaleString()})`;
+          return t('Enter max output tokens (leave blank to send default: {0})', DEFAULT_MAX_OUTPUT_TOKENS.toLocaleString());
         }
-        return 'Enter max output tokens (leave blank to let the provider decide)';
+        return t('Enter max output tokens (leave blank to let the provider decide)');
       },
-      placeholder: 'Leave blank for default',
+      placeholder: t('Leave blank for default'),
       positiveInteger: true,
       getDescription: (draft, context) => {
         if (draft.maxOutputTokens !== undefined) {
@@ -163,38 +164,38 @@ export const modelFormSchema: FormSchema<ModelConfig> = {
           ?.providerType;
         if (!providerType) return undefined;
         if (providerType === 'anthropic') {
-          return `default: ${DEFAULT_MAX_OUTPUT_TOKENS.toLocaleString()}`;
+          return t('default: {0}', DEFAULT_MAX_OUTPUT_TOKENS.toLocaleString());
         }
-        return 'provider decides';
+        return t('provider decides');
       },
     },
     // Tool Calling (custom due to special limit option)
     {
       key: 'capabilities',
       type: 'custom',
-      label: 'Tool Calling',
+      label: t('Tool Calling'),
       icon: 'tools',
       section: 'capabilities',
       edit: async (draft) => {
         const picked = await pickQuickItem<
           vscode.QuickPickItem & { value: boolean | 'limit' }
         >({
-          title: 'Tool Calling Support',
-          placeholder: 'Select tool calling support',
+          title: t('Tool Calling Support'),
+          placeholder: t('Select tool calling support'),
           items: [
             {
-              label: 'Enabled',
-              description: 'Model supports tool calling',
+              label: t('Enabled'),
+              description: t('Model supports tool calling'),
               value: true,
             },
             {
-              label: 'Disabled',
-              description: 'Model does not support tool calling',
+              label: t('Disabled'),
+              description: t('Model does not support tool calling'),
               value: false,
             },
             {
-              label: 'Limited...',
-              description: 'Set a maximum number of tools',
+              label: t('Limited...'),
+              description: t('Set a maximum number of tools'),
               value: 'limit',
             },
           ],
@@ -204,8 +205,8 @@ export const modelFormSchema: FormSchema<ModelConfig> = {
 
         if (picked.value === 'limit') {
           const limitStr = await showInput({
-            prompt: 'Enter maximum number of tools',
-            placeHolder: 'e.g., 10',
+            prompt: t('Enter maximum number of tools'),
+            placeHolder: t('e.g., 10'),
             value:
               typeof draft.capabilities?.toolCalling === 'number'
                 ? draft.capabilities.toolCalling.toString()
@@ -230,66 +231,66 @@ export const modelFormSchema: FormSchema<ModelConfig> = {
       },
       getDescription: (draft) =>
         typeof draft.capabilities?.toolCalling === 'number'
-          ? `Enabled (max ${draft.capabilities.toolCalling})`
+          ? t('Enabled (max {0})', draft.capabilities.toolCalling)
           : draft.capabilities?.toolCalling
-          ? 'Enabled'
-          : 'Disabled',
+          ? t('Enabled')
+          : t('Disabled'),
     },
     // Parallel Tool Calling
     {
       key: 'parallelToolCalling',
       type: 'picker',
-      label: 'Parallel Tool Calling',
+      label: t('Parallel Tool Calling'),
       icon: 'group-by-ref-type',
       section: 'capabilities',
-      title: 'Parallel Tool Calling',
-      placeholder: 'Enable or disable parallel tool calls',
+      title: t('Parallel Tool Calling'),
+      placeholder: t('Enable or disable parallel tool calls'),
       options: [
         {
-          label: 'Default',
-          description: 'Use provider default behavior',
+          label: t('Default'),
+          description: t('Use provider default behavior'),
           value: undefined,
         },
         {
-          label: 'Enable',
-          description: 'Allow parallel tool calls',
+          label: t('Enable'),
+          description: t('Allow parallel tool calls'),
           value: true,
         },
         {
-          label: 'Disable',
-          description: 'Disallow parallel tool calls',
+          label: t('Disable'),
+          description: t('Disallow parallel tool calls'),
           value: false,
         },
       ],
       getDescription: (draft) =>
         draft.parallelToolCalling === undefined
-          ? 'default'
+          ? t('default')
           : draft.parallelToolCalling
-          ? 'enable'
-          : 'disable',
+          ? t('enable')
+          : t('disable'),
     },
     // Image Input (custom because it modifies capabilities nested object)
     {
       key: 'capabilities',
       type: 'custom',
-      label: 'Image Input Support',
+      label: t('Image Input Support'),
       icon: 'file-media',
       section: 'capabilities',
       edit: async (draft) => {
         const picked = await pickQuickItem<
           vscode.QuickPickItem & { value: boolean }
         >({
-          title: 'Image Input Support',
-          placeholder: 'Enable or disable image input',
+          title: t('Image Input Support'),
+          placeholder: t('Enable or disable image input'),
           items: [
             {
-              label: 'Enabled',
-              description: 'Model supports image input',
+              label: t('Enabled'),
+              description: t('Model supports image input'),
               value: true,
             },
             {
-              label: 'Disabled',
-              description: 'Model does not support image input',
+              label: t('Disabled'),
+              description: t('Model does not support image input'),
               value: false,
             },
           ],
@@ -302,24 +303,24 @@ export const modelFormSchema: FormSchema<ModelConfig> = {
         }
       },
       getDescription: (draft) =>
-        draft.capabilities?.imageInput ? 'Enabled' : 'Disabled',
+        draft.capabilities?.imageInput ? t('Enabled') : t('Disabled'),
     },
     // Stream
     {
       key: 'stream',
       type: 'picker',
-      label: 'Stream',
+      label: t('Stream'),
       icon: 'diff-renamed',
       section: 'capabilities',
-      title: 'Stream Response',
-      placeholder: 'Select stream setting',
+      title: t('Stream Response'),
+      placeholder: t('Select stream setting'),
       options: booleanOptions({
-        default: 'Default',
-        defaultDesc: 'Use provider default',
-        true: 'True',
-        trueDesc: 'Enable streaming',
-        false: 'False',
-        falseDesc: 'Disable streaming',
+        default: t('Default'),
+        defaultDesc: t('Use provider default'),
+        true: t('True'),
+        trueDesc: t('Enable streaming'),
+        false: t('False'),
+        falseDesc: t('Disable streaming'),
       }),
       getDescription: (draft) => formatBoolean(draft.stream),
     },
@@ -327,7 +328,7 @@ export const modelFormSchema: FormSchema<ModelConfig> = {
     {
       key: 'thinking',
       type: 'custom',
-      label: 'Thinking',
+      label: t('Thinking'),
       icon: 'lightbulb',
       section: 'capabilities',
       edit: async (draft) => {
@@ -336,27 +337,27 @@ export const modelFormSchema: FormSchema<ModelConfig> = {
             value: 'enabled' | 'disabled' | 'auto' | undefined;
           }
         >({
-          title: 'Thinking Capability',
-          placeholder: 'Select thinking setting',
+          title: t('Thinking Capability'),
+          placeholder: t('Select thinking setting'),
           items: [
             {
-              label: 'Default',
-              description: 'Use provider default',
+              label: t('Default'),
+              description: t('Use provider default'),
               value: undefined,
             },
             {
-              label: 'Enabled',
-              description: 'Enable thinking',
+              label: t('Enabled'),
+              description: t('Enable thinking'),
               value: 'enabled',
             },
             {
-              label: 'Auto',
-              description: 'Auto thinking',
+              label: t('Auto'),
+              description: t('Auto thinking'),
               value: 'auto',
             },
             {
-              label: 'Disabled',
-              description: 'Disable thinking',
+              label: t('Disabled'),
+              description: t('Disable thinking'),
               value: 'disabled',
             },
           ],
@@ -370,8 +371,8 @@ export const modelFormSchema: FormSchema<ModelConfig> = {
           draft.thinking = { type: 'disabled' };
         } else {
           const budgetStr = await showInput({
-            prompt: 'Enter budget tokens for thinking',
-            placeHolder: 'Leave blank for default',
+            prompt: t('Enter budget tokens for thinking'),
+            placeHolder: t('Leave blank for default'),
             value: draft.thinking?.budgetTokens?.toString(),
             validateInput: validatePositiveIntegerOrEmpty,
           });
@@ -388,42 +389,42 @@ export const modelFormSchema: FormSchema<ModelConfig> = {
                 | undefined;
             }
           >({
-            title: 'Thinking Effort',
-            placeholder: 'Select thinking effort (optional)',
+            title: t('Thinking Effort'),
+            placeholder: t('Select thinking effort (optional)'),
             items: [
               {
-                label: 'Default',
-                description: 'Let the provider decide',
+                label: t('Default'),
+                description: t('Let the provider decide'),
                 value: undefined,
                 picked: draft.thinking?.effort === undefined,
               },
               {
-                label: 'None',
+                label: t('None'),
                 value: 'none',
                 picked: draft.thinking?.effort === 'none',
               },
               {
-                label: 'Minimal',
+                label: t('Minimal'),
                 value: 'minimal',
                 picked: draft.thinking?.effort === 'minimal',
               },
               {
-                label: 'Low',
+                label: t('Low'),
                 value: 'low',
                 picked: draft.thinking?.effort === 'low',
               },
               {
-                label: 'Medium',
+                label: t('Medium'),
                 value: 'medium',
                 picked: draft.thinking?.effort === 'medium',
               },
               {
-                label: 'High',
+                label: t('High'),
                 value: 'high',
                 picked: draft.thinking?.effort === 'high',
               },
               {
-                label: 'Extra High',
+                label: t('Extra High'),
                 value: 'xhigh',
                 picked: draft.thinking?.effort === 'xhigh',
               },
@@ -438,15 +439,15 @@ export const modelFormSchema: FormSchema<ModelConfig> = {
         }
       },
       getDescription: (draft) => {
-        if (!draft.thinking) return 'default';
-        if (draft.thinking.type === 'disabled') return 'disabled';
-        const typeLabel = draft.thinking.type === 'auto' ? 'auto' : 'enabled';
+        if (!draft.thinking) return t('default');
+        if (draft.thinking.type === 'disabled') return t('disabled');
+        const typeLabel = draft.thinking.type === 'auto' ? t('auto') : t('enabled');
         const details: string[] = [];
         if (draft.thinking.budgetTokens !== undefined) {
-          details.push(`${draft.thinking.budgetTokens} tokens`);
+          details.push(t('{0} tokens', draft.thinking.budgetTokens));
         }
         if (draft.thinking.effort) {
-          details.push(`${draft.thinking.effort} effort`);
+          details.push(t('{0} effort', draft.thinking.effort));
         }
         return `${typeLabel}${
           details.length > 0 ? ` (${details.join(', ')})` : ''
@@ -457,117 +458,117 @@ export const modelFormSchema: FormSchema<ModelConfig> = {
     {
       key: 'verbosity',
       type: 'picker',
-      label: 'Verbosity',
+      label: t('Verbosity'),
       icon: 'code-review',
       section: 'capabilities',
-      title: 'Verbosity',
-      placeholder: 'Choose response verbosity',
+      title: t('Verbosity'),
+      placeholder: t('Choose response verbosity'),
       options: [
         {
-          label: 'Default',
-          description: 'Use provider default',
+          label: t('Default'),
+          description: t('Use provider default'),
           value: undefined,
         },
         {
-          label: 'Low',
-          description: 'More concise responses',
+          label: t('Low'),
+          description: t('More concise responses'),
           value: 'low',
         },
         {
-          label: 'Medium',
-          description: 'Balanced verbosity',
+          label: t('Medium'),
+          description: t('Balanced verbosity'),
           value: 'medium',
         },
         {
-          label: 'High',
-          description: 'More verbose responses',
+          label: t('High'),
+          description: t('More verbose responses'),
           value: 'high',
         },
       ],
-      getDescription: (draft) => draft.verbosity ?? 'default',
+      getDescription: (draft) => draft.verbosity ?? t('default'),
     },
     // Temperature
     {
       key: 'temperature',
       type: 'number',
-      label: 'Temperature',
+      label: t('Temperature'),
       icon: 'circle',
       section: 'parameters',
-      prompt: 'Enter temperature',
-      placeholder: 'Leave blank for default',
+      prompt: t('Enter temperature'),
+      placeholder: t('Leave blank for default'),
       getDescription: (draft) =>
         draft.temperature === undefined
-          ? 'default'
+          ? t('default')
           : draft.temperature.toString(),
     },
     // Top K
     {
       key: 'topK',
       type: 'number',
-      label: 'Top K',
+      label: t('Top K'),
       icon: 'circle',
       section: 'parameters',
-      prompt: 'Enter Top K',
-      placeholder: 'Leave blank for default',
+      prompt: t('Enter Top K'),
+      placeholder: t('Leave blank for default'),
       positiveInteger: true,
       getDescription: (draft) =>
-        draft.topK === undefined ? 'default' : draft.topK.toString(),
+        draft.topK === undefined ? t('default') : draft.topK.toString(),
     },
     // Top P
     {
       key: 'topP',
       type: 'number',
-      label: 'Top P',
+      label: t('Top P'),
       icon: 'circle',
       section: 'parameters',
-      prompt: 'Enter Top P',
-      placeholder: 'Leave blank for default',
+      prompt: t('Enter Top P'),
+      placeholder: t('Leave blank for default'),
       getDescription: (draft) =>
-        draft.topP === undefined ? 'default' : draft.topP.toString(),
+        draft.topP === undefined ? t('default') : draft.topP.toString(),
     },
     // Frequency Penalty
     {
       key: 'frequencyPenalty',
       type: 'number',
-      label: 'Frequency Penalty',
+      label: t('Frequency Penalty'),
       icon: 'circle',
       section: 'parameters',
-      prompt: 'Enter Frequency Penalty',
-      placeholder: 'Leave blank for default',
+      prompt: t('Enter Frequency Penalty'),
+      placeholder: t('Leave blank for default'),
       getDescription: (draft) =>
         draft.frequencyPenalty === undefined
-          ? 'default'
+          ? t('default')
           : draft.frequencyPenalty.toString(),
     },
     // Presence Penalty
     {
       key: 'presencePenalty',
       type: 'number',
-      label: 'Presence Penalty',
+      label: t('Presence Penalty'),
       icon: 'circle',
       section: 'parameters',
-      prompt: 'Enter Presence Penalty',
-      placeholder: 'Leave blank for default',
+      prompt: t('Enter Presence Penalty'),
+      placeholder: t('Leave blank for default'),
       getDescription: (draft) =>
         draft.presencePenalty === undefined
-          ? 'default'
+          ? t('default')
           : draft.presencePenalty.toString(),
     },
     // Extra Headers
     {
       key: 'extraHeaders',
       type: 'custom',
-      label: 'Extra Headers',
+      label: t('Extra Headers'),
       icon: 'json',
       section: 'others',
       edit: async () => {
         vscode.window
           .showInformationMessage(
-            'Extra headers must be configured in VS Code settings (JSON).',
-            'Open Settings',
+            t('Extra headers must be configured in VS Code settings (JSON).'),
+            t('Open Settings'),
           )
           .then((choice) => {
-            if (choice === 'Open Settings') {
+            if (choice === t('Open Settings')) {
               vscode.commands.executeCommand(
                 'workbench.action.openSettingsJson',
               );
@@ -576,24 +577,24 @@ export const modelFormSchema: FormSchema<ModelConfig> = {
       },
       getDescription: (draft) =>
         draft.extraHeaders
-          ? `${Object.keys(draft.extraHeaders).length} headers`
-          : 'Not configured',
+          ? t('{0} headers', Object.keys(draft.extraHeaders).length)
+          : t('Not configured'),
     },
     // Extra Body
     {
       key: 'extraBody',
       type: 'custom',
-      label: 'Extra Body',
+      label: t('Extra Body'),
       icon: 'json',
       section: 'others',
       edit: async () => {
         vscode.window
           .showInformationMessage(
-            'Extra body parameters must be configured in VS Code settings (JSON).',
-            'Open Settings',
+            t('Extra body parameters must be configured in VS Code settings (JSON).'),
+            t('Open Settings'),
           )
           .then((choice) => {
-            if (choice === 'Open Settings') {
+            if (choice === t('Open Settings')) {
               vscode.commands.executeCommand(
                 'workbench.action.openSettingsJson',
               );
@@ -602,8 +603,8 @@ export const modelFormSchema: FormSchema<ModelConfig> = {
       },
       getDescription: (draft) =>
         draft.extraBody
-          ? `${Object.keys(draft.extraBody).length} properties`
-          : 'Not configured',
+          ? t('{0} properties', Object.keys(draft.extraBody).length)
+          : t('Not configured'),
     },
   ],
 };

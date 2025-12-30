@@ -6,6 +6,7 @@ import type {
   UiResume,
   WellKnownProviderNameRoute,
 } from '../router/types';
+import { t } from '../../i18n';
 
 export async function runWellKnownProviderNameScreen(
   ctx: UiContext,
@@ -13,10 +14,10 @@ export async function runWellKnownProviderNameScreen(
   _resume: UiResume | undefined,
 ): Promise<UiNavAction> {
   const name = await showInput({
-    title: 'Provider Name',
-    prompt: 'Enter a name for this provider',
+    title: t('Provider Name'),
+    prompt: t('Enter a name for this provider'),
     value: route.draft.name,
-    placeHolder: 'e.g., My Provider, OpenRouter, Custom',
+    placeHolder: t('e.g., My Provider, OpenRouter, Custom'),
     ignoreFocusOut: true,
     showBackButton: true,
     validateInput: (value) => validateProviderNameUnique(value, ctx.store),

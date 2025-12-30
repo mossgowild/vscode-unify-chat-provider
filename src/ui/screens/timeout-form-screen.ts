@@ -8,6 +8,7 @@ import type {
   UiNavAction,
   UiResume,
 } from '../router/types';
+import { t } from '../../i18n';
 
 interface TimeoutFormItem extends vscode.QuickPickItem {
   action?: 'back' | 'reset';
@@ -22,28 +23,28 @@ export async function runTimeoutFormScreen(
   const timeout = route.timeout;
 
   const items: TimeoutFormItem[] = [
-    { label: '$(arrow-left) Back', action: 'back' },
+    { label: `$(arrow-left) ${t('Back')}`, action: 'back' },
     { label: '', kind: vscode.QuickPickItemKind.Separator },
     {
-      label: '$(clock) Connection Timeout',
+      label: `$(clock) ${t('Connection Timeout')}`,
       description: formatTimeoutValue(timeout.connection, 'connection'),
-      detail: 'Maximum time to wait for TCP connection to be established',
+      detail: t('Maximum time to wait for TCP connection to be established'),
       field: 'connection',
     },
     {
-      label: '$(clock) Response Timeout',
+      label: `$(clock) ${t('Response Timeout')}`,
       description: formatTimeoutValue(timeout.response, 'response'),
       detail:
-        'Maximum time to wait between data chunks during streaming (resets on each data received)',
+        t('Maximum time to wait between data chunks during streaming (resets on each data received)'),
       field: 'response',
     },
     { label: '', kind: vscode.QuickPickItemKind.Separator },
-    { label: '$(refresh) Reset to Defaults', action: 'reset' },
+    { label: `$(refresh) ${t('Reset to Defaults')}`, action: 'reset' },
   ];
 
   const selection = await pickQuickItem<TimeoutFormItem>({
-    title: 'Timeout Configuration',
-    placeholder: 'Select a field to edit',
+    title: t('Timeout Configuration'),
+    placeholder: t('Select a field to edit'),
     ignoreFocusOut: true,
     items,
   });
@@ -72,7 +73,7 @@ function formatTimeoutValue(
 ): string {
   const defaultValue = DEFAULT_TIMEOUT_CONFIG[field];
   if (value === undefined) {
-    return `default (${formatMs(defaultValue)})`;
+    return t('default ({0})', formatMs(defaultValue));
   }
   return formatMs(value);
 }
@@ -101,19 +102,19 @@ async function editTimeoutField(
   const defaultValue = DEFAULT_TIMEOUT_CONFIG[field];
 
   const label =
-    field === 'connection' ? 'Connection Timeout' : 'Response Timeout';
-  const placeholder = `Enter timeout in milliseconds (default: ${defaultValue})`;
+    field === 'connection' ? t('Connection Timeout') : t('Response Timeout');
+  const placeholder = t('Enter timeout in milliseconds (default: {0})', defaultValue);
 
   const input = await vscode.window.showInputBox({
     title: label,
     prompt: placeholder,
     value: currentValue?.toString() ?? '',
-    placeHolder: `e.g., ${defaultValue}`,
+    placeHolder: t('e.g., {0}', defaultValue),
     validateInput: (value) => {
       if (!value.trim()) return null; // Empty is valid (means use default)
       const n = Number(value);
       if (Number.isNaN(n) || n <= 0) {
-        return 'Please enter a positive number';
+        return t('Please enter a positive number');
       }
       return null;
     },

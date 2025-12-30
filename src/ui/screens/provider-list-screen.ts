@@ -21,6 +21,7 @@ import {
   deleteProviderApiKeySecretIfUnused,
   resolveProvidersForExportOrShowError,
 } from '../../api-key-utils';
+import { t } from '../../i18n';
 
 type ProviderListItem = vscode.QuickPickItem & {
   action?:
@@ -40,8 +41,8 @@ export async function runProviderListScreen(
   _resume: UiResume | undefined,
 ): Promise<UiNavAction> {
   const selection = await pickQuickItem<ProviderListItem>({
-    title: 'Manage Providers',
-    placeholder: 'Select a provider to edit, or add a new one',
+    title: t('Manage Providers'),
+    placeholder: t('Select a provider to edit, or add a new one'),
     ignoreFocusOut: false,
     items: await buildProviderListItems(ctx.store),
     onDidTriggerItemButton: async (event, qp) => {
@@ -91,7 +92,7 @@ export async function runProviderListScreen(
     const provider = ctx.store.getProvider(selection.providerName);
     if (!provider) {
       vscode.window.showErrorMessage(
-        `Provider "${selection.providerName}" not found.`,
+        t('Provider "{0}" not found.', selection.providerName),
       );
       return { kind: 'stay' };
     }
@@ -130,7 +131,7 @@ export async function runProviderListScreen(
   if (selection.action === 'export-all') {
     const providers = ctx.store.endpoints;
     if (providers.length === 0) {
-      vscode.window.showInformationMessage('No providers configured.');
+      vscode.window.showInformationMessage(t('No providers configured.'));
       return { kind: 'stay' };
     }
 
@@ -154,7 +155,7 @@ export async function runProviderListScreen(
     const existing = ctx.store.getProvider(selection.providerName);
     if (!existing) {
       vscode.window.showErrorMessage(
-        `Provider "${selection.providerName}" not found.`,
+        t('Provider "{0}" not found.', selection.providerName),
       );
       return { kind: 'stay' };
     }
@@ -193,22 +194,22 @@ async function buildProviderListItems(
 ): Promise<ProviderListItem[]> {
   const items: ProviderListItem[] = [
     {
-      label: '$(add) Add Provider...',
+      label: '$(add) ' + t('Add Provider...'),
       action: 'add',
       alwaysShow: true,
     },
     {
-      label: '$(star-empty) Add From Well-Known Provider List...',
+      label: '$(star-empty) ' + t('Add From Well-Known Provider List...'),
       action: 'add-from-wellknown',
       alwaysShow: true,
     },
     {
-      label: '$(file-code) Import From Config...',
+      label: '$(file-code) ' + t('Import From Config...'),
       action: 'add-from-base64',
       alwaysShow: true,
     },
     {
-      label: '$(git-stash) Import From Other Applications...',
+      label: '$(git-stash) ' + t('Import From Other Applications...'),
       action: 'import-from-other-applications',
       alwaysShow: true,
     },
@@ -221,21 +222,21 @@ async function buildProviderListItems(
     items.push({
       label: provider.name,
       description: provider.baseUrl,
-      detail: modelList ? `Models: ${modelList}` : 'No models',
+      detail: modelList ? t('Models: {0}', modelList) : t('No models'),
       action: 'provider',
       providerName: provider.name,
       buttons: [
         {
           iconPath: new vscode.ThemeIcon('export'),
-          tooltip: 'Export as Base64 config',
+          tooltip: t('Export as Base64 config'),
         },
         {
           iconPath: new vscode.ThemeIcon('files'),
-          tooltip: 'Duplicate provider',
+          tooltip: t('Duplicate provider'),
         },
         {
           iconPath: new vscode.ThemeIcon('trash'),
-          tooltip: 'Delete provider',
+          tooltip: t('Delete provider'),
         },
       ],
     });
@@ -245,7 +246,7 @@ async function buildProviderListItems(
     items.push({ label: '', kind: vscode.QuickPickItemKind.Separator });
   }
   items.push({
-    label: '$(export) Export All Providers...',
+    label: '$(export) ' + t('Export All Providers...'),
     action: 'export-all',
     alwaysShow: true,
   });

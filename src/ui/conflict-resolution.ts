@@ -1,4 +1,5 @@
 import * as vscode from 'vscode';
+import { t } from '../i18n';
 import type { ConfigStore } from '../config-store';
 import type { ModelConfig } from '../types';
 import {
@@ -26,21 +27,24 @@ export interface ConflictInfo {
 export async function promptConflictResolution(
   info: ConflictInfo,
 ): Promise<ConflictResolution> {
-  const itemType = info.kind === 'provider' ? 'provider' : 'model';
-  const itemField = info.kind === 'provider' ? 'name' : 'ID';
+  const itemType = info.kind === 'provider' ? t('provider') : t('model');
+  const itemField = info.kind === 'provider' ? t('name') : t('ID');
   const conflictList = info.conflicts.map((c) => `• ${c}`).join('\n');
 
-  const message = `The following ${itemType} ${itemField}s already exist:\n${conflictList}`;
+  const message = t('The following {0} {1}s already exist:\n{2}', itemType, itemField, conflictList);
+
+  const overwriteAll = t('Overwrite All');
+  const renameAll = t('Rename All');
 
   const choice = await vscode.window.showWarningMessage(
     message,
     { modal: true },
-    'Overwrite All',
-    'Rename All',
+    overwriteAll,
+    renameAll,
   );
 
-  if (choice === 'Overwrite All') return 'overwrite';
-  if (choice === 'Rename All') return 'rename';
+  if (choice === overwriteAll) return 'overwrite';
+  if (choice === renameAll) return 'rename';
   return 'cancel';
 }
 

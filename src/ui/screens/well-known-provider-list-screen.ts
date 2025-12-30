@@ -9,6 +9,7 @@ import type {
   WellKnownProviderListRoute,
 } from '../router/types';
 import { ProviderConfig } from '../../types';
+import { t } from '../../i18n';
 
 type WellKnownProviderItem = vscode.QuickPickItem & {
   action?: 'back';
@@ -21,8 +22,8 @@ export async function runWellKnownProviderListScreen(
   _resume: UiResume | undefined,
 ): Promise<UiNavAction> {
   const picked = await pickQuickItem<WellKnownProviderItem>({
-    title: 'Add From Well-Known Provider List',
-    placeholder: 'Select a provider',
+    title: t('Add From Well-Known Provider List'),
+    placeholder: t('Select a provider'),
     matchOnDescription: true,
     matchOnDetail: true,
     ignoreFocusOut: true,

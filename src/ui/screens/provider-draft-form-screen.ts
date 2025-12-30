@@ -18,6 +18,7 @@ import type {
 } from '../router/types';
 import { deepClone } from '../../config-ops';
 import { officialModelsManager } from '../../official-models-manager';
+import { t } from '../../i18n';
 
 export async function runProviderDraftFormScreen(
   ctx: UiContext,
@@ -39,9 +40,9 @@ export async function runProviderDraftFormScreen(
 
   const selection = await pickQuickItem<FormItem<ProviderFormDraft>>({
     title: draft.name?.trim()
-      ? `Edit Provider (${draft.name.trim()})`
-      : 'Edit Provider',
-    placeholder: 'Select a field to edit',
+      ? t('Edit Provider ({0})', draft.name.trim())
+      : t('Edit Provider'),
+    placeholder: t('Select a field to edit'),
     ignoreFocusOut: true,
     items: buildFormItems(
       providerFormSchema,
@@ -49,8 +50,8 @@ export async function runProviderDraftFormScreen(
       {
         isEditing: false,
         hasExport: false,
-        backLabel: '$(arrow-left) Back',
-        saveLabel: '$(check) Done',
+        backLabel: '$(arrow-left) ' + t('Back'),
+        saveLabel: '$(check) ' + t('Done'),
       },
       context,
     ),
@@ -99,7 +100,7 @@ export async function runProviderDraftFormScreen(
         kind: 'modelList',
         invocation: 'addProvider',
         models: draft.models,
-        providerLabel: draft.name ?? 'Provider',
+        providerLabel: draft.name ?? t('Provider'),
         requireAtLeastOne: false,
         draft,
       },

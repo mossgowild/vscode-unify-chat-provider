@@ -28,6 +28,7 @@ import {
   OfficialModelsDraftInput,
   OfficialModelsFetchState,
 } from '../../official-models-manager';
+import { t } from '../../i18n';
 
 /**
  * Generate a unique session ID for draft state management
@@ -96,8 +97,8 @@ export async function runModelListScreen(
   const providerName = route.draft?.name ?? route.providerLabel;
   const title =
     route.invocation === 'providerEdit'
-      ? `Provider: ${providerName}`
-      : `Models (${providerName})`;
+      ? t('Provider: {0}', providerName)
+      : t('Models ({0})', providerName);
   let didSave = false;
   await updateOfficialModelsDataForRoute(route);
 
@@ -106,7 +107,7 @@ export async function runModelListScreen(
 
   const selection = await pickQuickItem<ModelListItem>({
     title,
-    placeholder: 'Select a model to edit, or add a new one',
+    placeholder: t('Select a model to edit, or add a new one'),
     ignoreFocusOut: true,
     items: buildModelListItems(route, includeSave),
     onExternalRefresh: (refreshItems) => {
@@ -179,7 +180,7 @@ export async function runModelListScreen(
         const duplicated = duplicateModel(model, route.models);
         route.models.push(duplicated);
         vscode.window.showInformationMessage(
-          `Model duplicated as "${duplicated.id}".`,
+          t('Model duplicated as "{0}".', duplicated.id),
         );
         qp.items = buildModelListItems(route, includeSave);
         return;
@@ -188,7 +189,7 @@ export async function runModelListScreen(
       if (buttonIndex === 2) {
         if (mustKeepOne && route.models.length <= 1) {
           vscode.window.showWarningMessage(
-            'Cannot delete the last model. A provider must have at least one model.',
+            t('Cannot delete the last model. A provider must have at least one model.'),
           );
           return;
         }
@@ -220,7 +221,7 @@ export async function runModelListScreen(
       if (decision === 'save') {
         if (!route.onSave) {
           vscode.window.showErrorMessage(
-            'Save is not available in this context.',
+            t('Save is not available in this context.'),
           );
           return { kind: 'stay' };
         }
@@ -345,7 +346,7 @@ export async function runModelListScreen(
       kind: 'push',
       route: {
         kind: 'modelSelection',
-        title: 'Add From Official Model List',
+        title: t('Add From Official Model List'),
         existingModels: route.models,
         fetchModels: async () => {
           const result = await officialModelsManager.getOfficialModelsForDraft(
@@ -367,7 +368,7 @@ export async function runModelListScreen(
       kind: 'push',
       route: {
         kind: 'modelSelection',
-        title: 'Add From Well-Known Model List',
+        title: t('Add From Well-Known Model List'),
         existingModels: route.models,
         fetchModels: async () => normalizeWellKnownConfigs(WELL_KNOWN_MODELS),
       },
@@ -448,21 +449,21 @@ function buildModelListItems(
   const fetchState = route.officialModelsData?.state;
 
   const items: ModelListItem[] = [
-    { label: '$(arrow-left) Back', action: 'back' },
+    { label: `$(arrow-left) ${t('Back')}`, action: 'back' },
   ];
 
   items.push(
-    { label: '$(add) Add Model...', action: 'add' },
+    { label: `$(add) ${t('Add Model...')}`, action: 'add' },
     {
-      label: '$(star-empty) Add From Well-Known Model List...',
+      label: `$(star-empty) ${t('Add From Well-Known Model List...')}`,
       action: 'add-from-wellknown',
     },
     {
-      label: '$(broadcast) Add From Official Model List...',
+      label: `$(broadcast) ${t('Add From Official Model List...')}`,
       action: 'add-from-official',
     },
     {
-      label: '$(file-code) Import From Config...',
+      label: `$(file-code) ${t('Import From Config...')}`,
       action: 'add-from-base64',
     },
   );
@@ -473,8 +474,8 @@ function buildModelListItems(
 
     // Toggle item
     items.push({
-      label: `$(globe) Auto-Fetch Official Models`,
-      description: autoFetchEnabled ? 'Enabled' : 'Disabled',
+      label: `$(globe) ${t('Auto-Fetch Official Models')}`,
+      description: autoFetchEnabled ? t('Enabled') : t('Disabled'),
       action: 'toggle-auto-fetch',
     });
 
@@ -504,13 +505,13 @@ function buildModelListItems(
       buttons: [
         {
           iconPath: new vscode.ThemeIcon('export'),
-          tooltip: 'Export as Base64 config',
+          tooltip: t('Export as Base64 config'),
         },
         {
           iconPath: new vscode.ThemeIcon('files'),
-          tooltip: 'Duplicate model',
+          tooltip: t('Duplicate model'),
         },
-        { iconPath: new vscode.ThemeIcon('trash'), tooltip: 'Delete model' },
+        { iconPath: new vscode.ThemeIcon('trash'), tooltip: t('Delete model') },
       ],
     });
   }
@@ -532,7 +533,7 @@ function buildModelListItems(
         buttons: [
           {
             iconPath: new vscode.ThemeIcon('export'),
-            tooltip: 'Export as Base64 config',
+            tooltip: t('Export as Base64 config'),
           },
         ],
       });
@@ -547,7 +548,7 @@ function buildModelListItems(
   ) {
     items.push({ label: '', kind: vscode.QuickPickItemKind.Separator });
     items.push({
-      label: '$(gear) Provider Settings...',
+      label: `$(gear) ${t('Provider Settings...')}`,
       action: 'provider-settings',
     });
   }
@@ -556,14 +557,14 @@ function buildModelListItems(
     items.push({ label: '', kind: vscode.QuickPickItemKind.Separator });
 
     if (includeSave) {
-      items.push({ label: '$(check) Save', action: 'save' });
+      items.push({ label: `$(check) ${t('Save')}`, action: 'save' });
     }
 
-    items.push({ label: '$(export) Export', action: 'provider-copy' });
+    items.push({ label: `$(export) ${t('Export')}`, action: 'provider-copy' });
 
     if (route.existing && route.draft) {
-      items.push({ label: '$(files) Duplicate', action: 'provider-duplicate' });
-      items.push({ label: '$(trash) Delete', action: 'provider-delete' });
+      items.push({ label: `$(files) ${t('Duplicate')}`, action: 'provider-duplicate' });
+      items.push({ label: `$(trash) ${t('Delete')}`, action: 'provider-delete' });
     }
   }
 
@@ -580,7 +581,7 @@ function formatFetchStatus(state: OfficialModelsFetchState | undefined): {
 } {
   if (state?.isFetching) {
     return {
-      label: '$(sync~spin) Fetching...',
+      label: `$(sync~spin) ${t('Fetching...')}`,
     };
   }
 
@@ -592,16 +593,16 @@ function formatFetchStatus(state: OfficialModelsFetchState | undefined): {
       ? new Date(state.lastFetchTime)
       : new Date();
     return {
-      label: `$(warning) Last attempt: ${formatTimeAgo(errorDate)}`,
-      detail: `Error: ${state.lastError}`,
-      description: '(click to fetch)',
+      label: `$(warning) ${t('Last attempt: {0}', formatTimeAgo(errorDate))}`,
+      detail: t('Error: {0}', state.lastError),
+      description: t('(click to fetch)'),
     };
   }
 
   if (!state || !state.lastFetchTime) {
     return {
-      label: '$(refresh) Not fetched yet',
-      description: '(click to fetch)',
+      label: `$(refresh) ${t('Not fetched yet')}`,
+      description: t('(click to fetch)'),
     };
   }
 
@@ -609,8 +610,8 @@ function formatFetchStatus(state: OfficialModelsFetchState | undefined): {
   const timeAgo = formatTimeAgo(lastFetchDate);
 
   return {
-    label: `$(refresh) Last fetched: ${timeAgo}`,
-    description: '(click to fetch)',
+    label: `$(refresh) ${t('Last fetched: {0}', timeAgo)}`,
+    description: t('(click to fetch)'),
   };
 }
 
@@ -626,10 +627,10 @@ function formatTimeAgo(date: Date): string {
   const hours = Math.floor(minutes / 60);
   const days = Math.floor(hours / 24);
 
-  if (days > 0) return `${days}d ago`;
-  if (hours > 0) return `${hours}h ago`;
-  if (minutes > 0) return `${minutes}m ago`;
-  return 'just now';
+  if (days > 0) return t('{0}d ago', days);
+  if (hours > 0) return t('{0}h ago', hours);
+  if (minutes > 0) return t('{0}m ago', minutes);
+  return t('just now');
 }
 
 async function updateOfficialModelsDataForRoute(

@@ -11,6 +11,7 @@ import {
   promptConflictResolution,
   generateUniqueModelIdAndName,
 } from '../conflict-resolution';
+import { t } from '../../i18n';
 
 type ModelSelectionItem = vscode.QuickPickItem & {
   model?: ModelConfig;
@@ -34,7 +35,7 @@ async function showModelSelectionPicker(
   return new Promise<ModelConfig[] | undefined>((resolve) => {
     const qp = vscode.window.createQuickPick<ModelSelectionItem>();
     qp.title = route.title;
-    qp.placeholder = 'Loading models...';
+    qp.placeholder = t('Loading models...');
     qp.canSelectMany = true;
     qp.ignoreFocusOut = true;
     qp.busy = true;
@@ -55,7 +56,7 @@ async function showModelSelectionPicker(
       .then((models) => {
         isLoading = false;
         qp.busy = false;
-        qp.placeholder = 'Select models to add';
+        qp.placeholder = t('Select models to add');
 
         const items: ModelSelectionItem[] = [];
 
@@ -71,8 +72,8 @@ async function showModelSelectionPicker(
 
         if (models.length === 0) {
           items.push({
-            label: '$(info) No models available',
-            description: 'The API returned no models',
+            label: `$(info) ${t('No models available')}`,
+            description: t('The API returned no models'),
           });
         }
 
@@ -81,11 +82,11 @@ async function showModelSelectionPicker(
       .catch((error) => {
         isLoading = false;
         qp.busy = false;
-        qp.placeholder = 'Failed to load models';
+        qp.placeholder = t('Failed to load models');
         qp.canSelectMany = false;
         qp.items = [
           {
-            label: '$(error) Failed to load models',
+            label: `$(error) ${t('Failed to load models')}`,
             description: error instanceof Error ? error.message : String(error),
           },
         ];
@@ -184,9 +185,9 @@ async function showModelSelectionPicker(
       }
 
       vscode.window.showInformationMessage(
-        `Added ${selectedModels.length} model(s): ${selectedModels
+        t('Added {0} model(s): {1}', selectedModels.length, selectedModels
           .map((m) => m.name || m.id)
-          .join(', ')}`,
+          .join(', ')),
       );
 
       qp.hide();

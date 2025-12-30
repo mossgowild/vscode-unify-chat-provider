@@ -1,4 +1,5 @@
 import * as vscode from 'vscode';
+import { t } from '../i18n';
 
 export interface QuickPickConfig<T extends vscode.QuickPickItem> {
   title?: string;
@@ -177,11 +178,11 @@ export async function showInput(options: {
 
   const showValueButton: vscode.QuickInputButton = {
     iconPath: new vscode.ThemeIcon('eye'),
-    tooltip: 'Show',
+    tooltip: t('Show'),
   };
   const hideValueButton: vscode.QuickInputButton = {
     iconPath: new vscode.ThemeIcon('eye-closed'),
-    tooltip: 'Hide',
+    tooltip: t('Hide'),
   };
 
   const updateButtons = () => {
@@ -285,7 +286,7 @@ export async function showInput(options: {
 
 export async function showValidationErrors(errors: string[]): Promise<void> {
   if (errors.length === 0) return;
-  await vscode.window.showErrorMessage(`Please fix:\n${errors.join('\n')}`, {
+  await vscode.window.showErrorMessage(t('Please fix:\n{0}', errors.join('\n')), {
     modal: true,
   });
 }
@@ -298,12 +299,13 @@ export async function confirmDelete(
   itemName: string,
   itemType = 'item',
 ): Promise<boolean> {
+  const deleteButton = t('Delete');
   const result = await vscode.window.showWarningMessage(
-    `Delete ${itemType} "${itemName}"?`,
+    t('Delete {0} "{1}"?', itemType, itemName),
     { modal: true },
-    'Delete',
+    deleteButton,
   );
-  return result === 'Delete';
+  return result === deleteButton;
 }
 
 /**
@@ -314,12 +316,13 @@ export async function confirmRemove(
   itemName: string,
   itemType = 'item',
 ): Promise<boolean> {
+  const removeButton = t('Remove');
   const result = await vscode.window.showWarningMessage(
-    `Are you sure you want to remove ${itemType} "${itemName}"?`,
+    t('Are you sure you want to remove {0} "{1}"?', itemType, itemName),
     { modal: true },
-    'Remove',
+    removeButton,
   );
-  return result === 'Remove';
+  return result === removeButton;
 }
 
 /**
@@ -327,7 +330,7 @@ export async function confirmRemove(
  */
 export function showDeletedMessage(itemName: string, itemType = 'item'): void {
   vscode.window.showInformationMessage(
-    `${capitalize(itemType)} "${itemName}" has been deleted.`,
+    t('{0} "{1}" has been deleted.', capitalize(itemType), itemName),
   );
 }
 
@@ -336,7 +339,7 @@ export function showDeletedMessage(itemName: string, itemType = 'item'): void {
  */
 export function showRemovedMessage(itemName: string, itemType = 'item'): void {
   vscode.window.showInformationMessage(
-    `${capitalize(itemType)} "${itemName}" has been removed.`,
+    t('{0} "{1}" has been removed.', capitalize(itemType), itemName),
   );
 }
 

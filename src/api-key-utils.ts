@@ -1,9 +1,10 @@
 import * as vscode from 'vscode';
 import type { ProviderConfig } from './types';
 import type { ApiKeySecretStore } from './api-key-secret-store';
+import { t } from './i18n';
 
 export const MISSING_API_KEY_FOR_COPY_MESSAGE =
-  'API key is missing. Please re-enter it before exporting the configuration.';
+  t('API key is missing. Please re-enter it before exporting the configuration.');
 
 export async function resolveApiKeyForExport(
   apiKeyStore: ApiKeySecretStore,
@@ -56,9 +57,7 @@ export async function resolveProvidersForExportOrShowError(options: {
   if (missing.length > 0) {
     const message =
       options.message ??
-      `API key is missing for: ${missing.join(
-        ', ',
-      )}. Please re-enter before exporting.`;
+      t('API key is missing for: {0}. Please re-enter before exporting.', missing.join(', '));
     vscode.window.showErrorMessage(message, { modal: true });
     return undefined;
   }

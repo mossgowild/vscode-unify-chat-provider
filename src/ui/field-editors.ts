@@ -1,4 +1,5 @@
 import * as vscode from 'vscode';
+import { t } from '../i18n';
 import { pickQuickItem, showInput } from './component';
 import type {
   FieldContext,
@@ -100,13 +101,13 @@ async function editNumericField<T>(
     : (v: string) => {
         if (!v) return null;
         const n = Number(v);
-        if (isNaN(n)) return 'Must be a number';
+        if (isNaN(n)) return t('Must be a number');
         return null;
       };
 
   const val = await showInput({
     prompt,
-    placeHolder: field.placeholder || 'Leave blank for default',
+    placeHolder: field.placeholder || t('Leave blank for default'),
     value: currentValue?.toString() || '',
     validateInput: validator,
   });
@@ -170,18 +171,18 @@ export function booleanOptions(labels?: {
 }): Array<{ label: string; description?: string; value: boolean | undefined }> {
   return [
     {
-      label: labels?.default ?? 'Default',
-      description: labels?.defaultDesc ?? 'Use provider default',
+      label: labels?.default ?? t('Default'),
+      description: labels?.defaultDesc ?? t('Use provider default'),
       value: undefined,
     },
     {
-      label: labels?.true ?? 'True',
-      description: labels?.trueDesc ?? 'Enable',
+      label: labels?.true ?? t('True'),
+      description: labels?.trueDesc ?? t('Enable'),
       value: true,
     },
     {
-      label: labels?.false ?? 'False',
-      description: labels?.falseDesc ?? 'Disable',
+      label: labels?.false ?? t('False'),
+      description: labels?.falseDesc ?? t('Disable'),
       value: false,
     },
   ];
@@ -198,12 +199,12 @@ export function enabledDisabledOptions(labels?: {
 }): Array<{ label: string; description?: string; value: boolean }> {
   return [
     {
-      label: labels?.enabled ?? 'Enabled',
+      label: labels?.enabled ?? t('Enabled'),
       description: labels?.enabledDesc,
       value: true,
     },
     {
-      label: labels?.disabled ?? 'Disabled',
+      label: labels?.disabled ?? t('Disabled'),
       description: labels?.disabledDesc,
       value: false,
     },
@@ -217,8 +218,8 @@ export function formatBoolean(
   value: boolean | undefined,
   labels?: { default?: string; true?: string; false?: string },
 ): string {
-  if (value === undefined) return labels?.default ?? 'default';
-  return value ? labels?.true ?? 'true' : labels?.false ?? 'false';
+  if (value === undefined) return labels?.default ?? t('default');
+  return value ? labels?.true ?? t('true') : labels?.false ?? t('false');
 }
 
 /**
@@ -228,6 +229,6 @@ export function formatOptional<T>(
   value: T | undefined,
   format?: (v: T) => string,
 ): string {
-  if (value === undefined) return 'default';
+  if (value === undefined) return t('default');
   return format ? format(value) : String(value);
 }

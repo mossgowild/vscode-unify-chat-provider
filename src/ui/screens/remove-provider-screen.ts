@@ -5,6 +5,7 @@ import { getAllModelsForProvider } from '../../utils';
 import { ProviderConfig } from '../../types';
 import { ApiKeySecretStore } from '../../api-key-secret-store';
 import { deleteProviderApiKeySecretIfUnused } from '../../api-key-utils';
+import { t } from '../../i18n';
 
 async function buildProviderItem(
   p: ProviderConfig,
@@ -14,7 +15,7 @@ async function buildProviderItem(
   return {
     label: p.name,
     description: p.baseUrl,
-    detail: `${allModels.length} model(s): ${modelList}`,
+    detail: t('{0} model(s): {1}', allModels.length, modelList),
     providerName: p.name,
   };
 }
@@ -25,7 +26,7 @@ export async function runRemoveProviderScreen(
 ): Promise<void> {
   const endpoints = store.endpoints;
   if (endpoints.length === 0) {
-    vscode.window.showInformationMessage('No providers configured.');
+    vscode.window.showInformationMessage(t('No providers configured.'));
     return;
   }
 
@@ -34,8 +35,8 @@ export async function runRemoveProviderScreen(
   const selection = await pickQuickItem<
     vscode.QuickPickItem & { providerName: string }
   >({
-    title: 'Remove Provider',
-    placeholder: 'Select a provider to remove',
+    title: t('Remove Provider'),
+    placeholder: t('Select a provider to remove'),
     items,
   });
 

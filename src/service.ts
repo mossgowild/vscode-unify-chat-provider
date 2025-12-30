@@ -12,6 +12,7 @@ import { createProvider } from './client/utils';
 import { formatModelDetail } from './ui/form-utils';
 import { getAllModelsForProvider } from './utils';
 import { ApiKeySecretStore } from './api-key-secret-store';
+import { t } from './i18n';
 
 export class UnifyChatService implements vscode.LanguageModelChatProvider {
   private readonly clients = new Map<string, ApiProvider>();
@@ -176,26 +177,26 @@ export class UnifyChatService implements vscode.LanguageModelChatProvider {
     }
 
     const confirm = await vscode.window.showErrorMessage(
-      `API key for provider "${provider.name}" is missing. Please re-enter it to continue.`,
+      t('API key for provider "{0}" is missing. Please re-enter it to continue.', provider.name),
       { modal: true },
-      'Re-enter API Key',
+      t('Re-enter API Key'),
     );
-    if (confirm !== 'Re-enter API Key') {
+    if (confirm !== t('Re-enter API Key')) {
       throw new Error(
-        `API key for provider "${provider.name}" is missing. Please re-enter it and try again.`,
+        t('API key for provider "{0}" is missing. Please re-enter it and try again.', provider.name),
       );
     }
 
     const entered = await vscode.window.showInputBox({
-      title: `API Key (${provider.name})`,
-      prompt: `Enter the API key for "${provider.name}"`,
+      title: t('API Key ({0})', provider.name),
+      prompt: t('Enter the API key for "{0}"', provider.name),
       password: true,
       ignoreFocusOut: true,
     });
     const apiKey = entered?.trim();
     if (!apiKey) {
       throw new Error(
-        `API key for provider "${provider.name}" is missing. Please re-enter it and try again.`,
+        t('API key for provider "{0}" is missing. Please re-enter it and try again.', provider.name),
       );
     }
 
