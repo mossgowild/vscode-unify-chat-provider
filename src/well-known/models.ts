@@ -2454,6 +2454,100 @@ const _WELL_KNOWN_MODELS = [
     },
   },
   {
+    id: 'gemini-3-pro-preview',
+    name: 'Gemini 3 Pro Preview',
+    maxInputTokens: 1048576,
+    maxOutputTokens: 65536,
+    stream: true,
+    thinking: {
+      type: 'enabled',
+    },
+    capabilities: {
+      toolCalling: true,
+      imageInput: true,
+    },
+  },
+  {
+    id: 'gemini-3-flash-preview',
+    name: 'Gemini 3 Flash Preview',
+    maxInputTokens: 1048576,
+    maxOutputTokens: 65536,
+    stream: true,
+    thinking: {
+      type: 'enabled',
+    },
+    capabilities: {
+      toolCalling: true,
+      imageInput: true,
+    },
+  },
+  {
+    id: 'gemini-2.5-pro',
+    name: 'Gemini 2.5 Pro',
+    maxInputTokens: 1048576,
+    maxOutputTokens: 65536,
+    stream: true,
+    thinking: {
+      type: 'auto',
+    },
+    capabilities: {
+      toolCalling: true,
+      imageInput: true,
+    },
+  },
+  {
+    id: 'gemini-2.5-flash',
+    name: 'Gemini 2.5 Flash',
+    maxInputTokens: 1048576,
+    maxOutputTokens: 65536,
+    stream: true,
+    thinking: {
+      type: 'auto',
+    },
+    capabilities: {
+      toolCalling: true,
+      imageInput: true,
+    },
+  },
+  {
+    id: 'gemini-2.5-flash-lite',
+    name: 'Gemini 2.5 Flash-Lite',
+    maxInputTokens: 1048576,
+    maxOutputTokens: 65536,
+    stream: true,
+    thinking: {
+      type: 'auto',
+    },
+    capabilities: {
+      toolCalling: true,
+      imageInput: true,
+    },
+  },
+  {
+    id: 'gemini-2.0-flash',
+    alternativeIds: ['gemini-2.0-flash-001', 'gemini-2.0-flash-exp'],
+    name: 'Gemini 2.0 Flash',
+    maxInputTokens: 1048576,
+    maxOutputTokens: 8192,
+    stream: true,
+    capabilities: {
+      toolCalling: true,
+      imageInput: true,
+    },
+  },
+  {
+    id: 'gemini-2.0-flash-lite',
+    alternativeIds: ['gemini-2.0-flash-lite-001'],
+    name: 'Gemini 2.0 Flash-Lite',
+    maxInputTokens: 1048576,
+    maxOutputTokens: 8192,
+    stream: true,
+    capabilities: {
+      toolCalling: true,
+      imageInput: true,
+    },
+  },
+  {
     id: 'hunyuan-2.0-thinking-20251109',
     alternativeIds: ['hunyuan-2.0-think'],
     name: 'HY 2.0 Think',
