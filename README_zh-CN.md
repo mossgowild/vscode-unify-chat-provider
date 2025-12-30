@@ -7,7 +7,7 @@ Unify Chat Provider
 </h1>
 
 <p align="center">
-通过 Language Model API，将多个大语言模型 API 提供商集成到 VS Code 的 GitHub Copilot Chat 中。
+通过 Language Model API，将多个大语言模型 API 供应商集成到 VS Code 的 GitHub Copilot Chat 中。
 </p>
 
 <!-- <br>
@@ -44,9 +44,9 @@ Unify Chat Provider
 选择一种最合适的方式开始：
 
 - [一键迁移](#一键迁移)：从其它应用或扩展迁移。
-- [一键配置](#一键配置)：添加内置支持的模型提供商。
+- [一键配置](#一键配置)：添加内置支持的模型供应商。
 - [导入与导出](#导入与导出)：已有备份的配置或他人分享的配置。
-- [手动配置](#手动配置)：完全从零开始添加任何提供商与模型。
+- [手动配置](#手动配置)：完全从零开始添加任何供应商与模型。
 
 > 无论使用哪种方式，在导入完成前后都能够对任何字段进行自定义。
 
@@ -74,7 +74,7 @@ Unify Chat Provider
 
 **操作步骤：**
 
-1. 打开 VS Code 命令面板，搜索 `Import Config From Other Applications`。
+1. 打开 VS Code 命令面板，搜索 `Unify Chat Provider: 从其他应用导入配置`。
 
    <div align="center">
    <img src="assets/screenshot-2.png" width="600" />
@@ -90,7 +90,7 @@ Unify Chat Provider
    - 该界面用于检查和修改即将导入的配置。
    - 详细介绍可查看 [供应商配置](#供应商配置) 文档。
 
-3. 点击 `Save` 按钮即可完成整个导入，立即在 Copilot Chat 中使用导入的模型。
+3. 点击 `保存` 按钮即可完成整个导入，立即在 Copilot Chat 中使用导入的模型。
 
    <div align="center">
    <img src="assets/screenshot-3.png" width="600" />
@@ -104,7 +104,7 @@ Unify Chat Provider
 
 **操作步骤：**
 
-1. 打开 VS Code 命令面板，搜索 `Add Provider From Well-Known Provider List`。
+1. 打开 VS Code 命令面板，搜索 `Unify Chat Provider: 从内置供应商列表添加供应商`。
 
    <div align="center">
    <img src="assets/screenshot-4.png" width="600" />
@@ -117,7 +117,7 @@ Unify Chat Provider
    - 该界面用于检查和修改即将导入的配置。
    - 详细介绍可查看 [供应商配置](#供应商配置) 文档。
 
-4. 点击 `Save` 按钮即可完成整个导入，立即在 Copilot Chat 中使用导入的模型。
+4. 点击 `保存` 按钮即可完成整个导入，立即在 Copilot Chat 中使用导入的模型。
 
    <div align="center">
    <img src="assets/screenshot-5.png" width="600" />
@@ -131,11 +131,11 @@ Unify Chat Provider
 
 0. 准备工作，在供应商文档中获取 API 的相关信息，至少包括以下三个：
 
-   - API Format：接口格式，如 OpenAI Chat Completion、Anthropic Messages 等。
-   - API Base URL：接口基础 URL 地址。
-   - API Key：通常是通过注册账号后在用户面板获取。
+   - `API 格式`：接口格式，如 OpenAI Chat Completion、Anthropic Messages 等。
+   - `API 基础 URL`：接口基础 URL 地址。
+   - `API Key`：通常是通过注册账号后在用户面板获取。
 
-1. 打开 VS Code 命令面板，搜索 `Add Provider`。
+1. 打开 VS Code 命令面板，搜索 `Unify Chat Provider: 添加供应商`。
 
    <div align="center">
    <img src="assets/screenshot-6.png" width="600" />
@@ -143,17 +143,17 @@ Unify Chat Provider
 
    - 该界面与 [供应商配置](#供应商配置) 界面相似，你可以阅读该界面的文档了解每个字段。
 
-2. 填写供应商的名称：`Name`。
+2. 填写供应商的名称：`名称`。
 
    - 该名称必须唯一，会在模型列表中展示，这里填写的是 `DeepSeek`。
    - 同一个供应商可以添加多个不同名称的配置，比如 `DeepSeek-Person`、`DeepSeek-Team`。
 
-3. 填写接口格式：`API Format`。
+3. 填写接口格式：`API 格式`。
 
    - DeepSeek 的接口是 `OpenAI Chat Completion` 格式，所以选则该格式。
    - 要了解支持的所有格式可查看 [API 格式支持表](#api-格式支持表)。
 
-4. 填写基础 URL：`API Base URL`。
+4. 填写基础 URL：`API 基础 URL`。
 
    - DeepSeek 的基础 URL 是 `https://api.deepseek.com`。
 
@@ -161,18 +161,18 @@ Unify Chat Provider
 
    - 将在 DeepSeek 控制台生成的 API Key 填写到该字段。
 
-6. 点击 `Models` 字段跳转到模型管理界面。
+6. 点击 `模型` 字段跳转到模型管理界面。
 
    <div align="center">
    <img src="assets/screenshot-7.png" width="600" />
    </div>
 
-7. 选中 `Auto-Fetch Official Models` 以启用自动拉取官方模型。
+7. 选中 `自动拉取官方模型` 以启用自动拉取官方模型。
 
-   - 本章节选择从官方自动拉取模型以减少配置步骤，该功能的详细介绍可查看 [自动拉取模型](#自动拉取模型)。
+   - 本章节选择从官方自动拉取模型以减少配置步骤，该功能的详细介绍可查看 [自动拉取官方模型](#自动拉取官方模型)。
    - 有关模型字段或其它添加方式的介绍可查看 [管理模型](#管理模型) 文档。
 
-8. 点击 `Save` 按钮即完成添加，你可以立即在 Copilot Chat 中使用其中的模型。
+8. 点击 `保存` 按钮即完成添加，你可以立即在 Copilot Chat 中使用其中的模型。
 
    <div align="center">
    <img src="assets/screenshot-5.png" width="600" />
@@ -185,25 +185,25 @@ Unify Chat Provider
 
 ### 供应商列表
 
-打开 VS Code 命令面板，搜索 `Manage Providers`。
+打开 VS Code 命令面板，搜索 `Unify Chat Provider: 管理供应商`。
 
 <div align="center">
 <img src="assets/screenshot-8.png" width="600" />
 </div>
 
-- `Add Provider`: 通过 [手动配置](#手动配置) 添加新的供应商。
-- `Add From Well-Known Provider List`: 通过 [一键配置](#一键配置) 添加新的供应商。
-- `Import From Config`: 导入已有的供应商或供应商数组配置，详细介绍请查看 [导入与导出](#导入与导出)。
-- `Import From Other Applications`: 通过 [一键迁移](#一键迁移) 从其它应用或扩展导入配置。
-- `Export All Providers`: 导出所有供应商的配置，详细介绍请查看 [导入与导出](#导入与导出)。
+- `添加供应商`: 通过 [手动配置](#手动配置) 添加新的供应商。
+- `从内置供应商列表添加`: 通过 [一键配置](#一键配置) 添加新的供应商。
+- `从配置导入`: 导入已有的供应商或供应商数组配置，详细介绍请查看 [导入与导出](#导入与导出)。
+- `从其他应用导入`: 通过 [一键迁移](#一键迁移) 从其它应用或扩展导入配置。
+- `导出所有供应商`: 导出所有供应商的配置，详细介绍请查看 [导入与导出](#导入与导出)。
 
 界面还会展示当前所有的供应商，点击其中一个供应商列表项则进入 [模型列表](#模型列表) 界面。
 
 列表项右侧的按钮组可执行其它操作：
 
-- `Export`: 导出该供应商的配置，详细介绍请查看 [导入与导出](#导入与导出)。
-- `Duplicate`: 克隆该供应商配置以创建一个新的配置。
-- `Delete`: 删除该供应商配置。
+- `导出`: 导出该供应商的配置，详细介绍请查看 [导入与导出](#导入与导出)。
+- `克隆`: 克隆该供应商配置以创建一个新的配置。
+- `删除`: 删除该供应商配置。
 
 ### 供应商配置
 
@@ -211,7 +211,7 @@ Unify Chat Provider
 <img src="assets/screenshot-10.png" width="600" />
 </div>
 
-- `Models`: 仅在添加或导入配置时存在该按钮，点击则进入 [模型列表](#模型列表) 界面。
+- `模型`: 仅在添加或导入配置时存在该按钮，点击则进入 [模型列表](#模型列表) 界面。
 
 界面会展示当前供应商的所有配置字段，具体字段说明可查看 [供应商参数](#供应商参数)。
 
@@ -230,15 +230,15 @@ Unify Chat Provider
 <img src="assets/screenshot-9.png" width="600" />
 </div>
 
-- `Add Model`: 进入 [手动添加模型](#手动添加模型) 界面。
-- `Add From Well-Known Model List`: 进入 [一键添加模型](#一键添加模型) 界面。
-- `Add From Official Model List`: 通过 API 接口拉取最新的官方模型列表，详细可查看 [一键添加模型](#一键添加模型)。
-- `Import From Config`: 导入已有的模型或模型数组配置，详细介绍可查看 [导入与导出](#导入与导出)。
-- `Auto-Fetch Official Models`：启用或禁用 [自动拉取模型](#自动拉取模型)。
-- `Provider Settings`: 进入 [供应商配置](#供应商配置) 界面。
-- `Export`: 导出该供应商或者模型数组配置，详细介绍请查看 [导入与导出](#导入与导出)。
-- `Duplicate`: 克隆该供应商配置以创建一个新的配置。
-- `Delete`: 删除该供应商配置。
+- `添加模型`: 进入 [手动添加模型](#手动添加模型) 界面。
+- `从内置模型列表添加`: 进入 [一键添加模型](#一键添加模型) 界面。
+- `从官方模型列表添加`: 通过 API 接口拉取最新的官方模型列表，详细可查看 [一键添加模型](#一键添加模型)。
+- `从配置导入`: 导入已有的模型或模型数组配置，详细介绍可查看 [导入与导出](#导入与导出)。
+- `自动拉取官方模型`：启用或禁用 [自动拉取官方模型](#自动拉取官方模型)。
+- `供应商配置`: 进入 [供应商配置](#供应商配置) 界面。
+- `导出`: 导出该供应商或者模型数组配置，详细介绍请查看 [导入与导出](#导入与导出)。
+- `克隆`: 克隆该供应商配置以创建一个新的配置。
+- `删除`: 删除该供应商配置。
 
 ### 手动添加模型
 
@@ -254,7 +254,7 @@ Unify Chat Provider
 
 所有支持的模型可查看 [模型支持表](#模型支持表)。
 
-### 自动拉取模型
+### 自动拉取官方模型
 
 该功能通过供应商的 API 接口定时拉取最新的模型列表，并且自动配置好推荐的参数，极大地简化了模型的添加过程。
 
@@ -268,8 +268,8 @@ Unify Chat Provider
 
 - 自动拉取的模型名称前面会有一个 `互联网` 图标以示区分。
 - 如果自动拉取的模型 ID 与手动配置的模型 ID 冲突，则只展示手动配置的模型。
-- 自动拉取的模型会定期更新，也可以点击 `(click to fetch)` 手动更新。
-- 通过 VS Code 命令 `Refresh All Provider's Official Models` 手动触发所有供应商的自动拉取更新。
+- 自动拉取的模型会定期更新，也可以点击 `（点击拉取）` 手动更新。
+- 通过 VS Code 命令 `Unify Chat Provider: 刷新所有供应商的官方模型` 手动触发所有供应商的自动拉取更新。
 
 ### 模型配置
 
@@ -277,9 +277,9 @@ Unify Chat Provider
 <img src="assets/screenshot-11.png" width="600" />
 </div>
 
-- `Export`: 导出该模型的配置，详细介绍请查看 [导入与导出](#导入与导出)。
-- `Duplicate`: 克隆该模型配置以创建一个新的配置。
-- `Delete`: 删除该模型配置。
+- `导出`: 导出该模型的配置，详细介绍请查看 [导入与导出](#导入与导出)。
+- `克隆`: 克隆该模型配置以创建一个新的配置。
+- `删除`: 删除该模型配置。
 
 界面会展示当前供应商的所有配置字段，具体字段说明可查看 [模型参数](#模型参数)。
 
@@ -293,10 +293,10 @@ Unify Chat Provider
 | ---------------- | ------------------------- | ----------------------------------------------------------------------------------- |
 | API 格式         | `type`                    | 供应商类型（决定 API 格式与兼容逻辑）。                                             |
 | 供应商名称       | `name`                    | 该供应商配置的唯一名称（用于列表展示与引用）。                                      |
-| API Base URL     | `baseUrl`                 | API 基础地址，例如 `https://api.anthropic.com`。                                    |
+| API 基础 URL     | `baseUrl`                 | API 基础地址，例如 `https://api.anthropic.com`。                                    |
 | API Key          | `apiKey`                  | 鉴权用 Key。                                                                        |
 | 模型列表         | `models`                  | 模型配置数组（`ModelConfig[]`）。                                                   |
-| 额外 Headers     | `extraHeaders`            | 会附加到每次请求的 HTTP Header（`Record<string, string>`）。                        |
+| 额外 Header      | `extraHeaders`            | 会附加到每次请求的 HTTP Header（`Record<string, string>`）。                        |
 | 额外 Body 字段   | `extraBody`               | 会附加到请求 body 的额外字段（`Record<string, unknown>`），用于对齐供应商私有参数。 |
 | 超时配置         | `timeout`                 | HTTP 请求与 SSE 流式的超时配置（毫秒）。                                            |
 | 建连超时         | `timeout.connection`      | TCP 建立连接的最大等待时间；默认 `10000`（10 秒）。                                 |
@@ -329,7 +329,7 @@ Unify Chat Provider
 | 思考模式          | `thinking.type`            | `enabled` / `disabled` / `auto`                                                  |
 | 思考预算 Tokens   | `thinking.budgetTokens`    | 思考 token 预算。                                                                |
 | 思考强度          | `thinking.effort`          | `none` / `minimal` / `low` / `medium` / `high` / `xhigh`                         |
-| 额外 Headers      | `extraHeaders`             | 会附加到该模型请求的 HTTP Header（`Record<string, string>`）。                   |
+| 额外 Header       | `extraHeaders`             | 会附加到该模型请求的 HTTP Header（`Record<string, string>`）。                   |
 | 额外 Body 字段    | `extraBody`                | 会附加到该模型请求 body 的额外字段（`Record<string, unknown>`）。                |
 
 ## 导入与导出
@@ -453,7 +453,7 @@ Google Cloud Vertex AI 共有三种身份验证方式：
   支持，但是在配置时需要注意：
 
   - 在 APIKey 字段中填写 JSON 文件路径，例如 `/path/to/your/keyfile.json`。
-  - 根据在平台中获取的 `project` 和 `location` 信息，在 `API Base URL` 字段中填写如下格式的地址：
+  - 根据在平台中获取的 `project` 和 `location` 信息，在 `API 基础 URL` 字段中填写如下格式的地址：
 
     ```
     https://<location>-aiplatform.googleapis.com/v1/projects/<project>/locations/<location>

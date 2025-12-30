@@ -74,7 +74,7 @@ See the [Application Migration Support Table](#application-migration-support-tab
 
 **Steps:**
 
-1. Open the VS Code Command Palette and search for `Import Config From Other Applications`.
+1. Open the VS Code Command Palette and search for `Unify Chat Provider: Import Config From Other Applications`.
 
    <div align="center">
    <img src="assets/screenshot-2.png" width="600" />
@@ -104,7 +104,7 @@ See the [Provider Support Table](#provider-support-table) for providers supporte
 
 **Steps:**
 
-1. Open the VS Code Command Palette and search for `Add Provider From Well-Known Provider List`.
+1. Open the VS Code Command Palette and search for `Unify Chat Provider: Add Provider From Well-Known Provider List`.
 
    <div align="center">
    <img src="assets/screenshot-4.png" width="600" />
@@ -135,7 +135,7 @@ This section uses DeepSeek as an example, adding the provider and two models.
    - `API Base URL`: The base URL of the API.
    - `API Key`: Usually generated in the provider’s console after account registration.
 
-1. Open the VS Code Command Palette and search for `Add Provider`.
+1. Open the VS Code Command Palette and search for `Unify Chat Provider: Add Provider`.
 
    <div align="center">
    <img src="assets/screenshot-6.png" width="600" />
@@ -185,7 +185,7 @@ This section uses DeepSeek as an example, adding the provider and two models.
 
 ### Provider List
 
-Open the VS Code Command Palette and search for `Manage Providers`.
+Open the VS Code Command Palette and search for `Unify Chat Provider: Manage Providers`.
 
 <div align="center">
 <img src="assets/screenshot-8.png" width="600" />
@@ -269,7 +269,7 @@ This feature periodically fetches the latest official model list from the provid
 - Auto-fetched models show an `internet` icon before the model name.
 - If an auto-fetched model ID conflicts with a manually configured one, only the manually configured model is shown.
 - Auto-fetched models are refreshed periodically; you can also click `(click to fetch)` to refresh manually.
-- Run the VS Code command `Refresh All Provider's Official Models` to trigger refresh for all providers.
+- Run the VS Code command `Unify Chat Provider: Refresh All Provider's Official Models` to trigger refresh for all providers.
 
 ### Model Settings
 
