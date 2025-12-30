@@ -54,12 +54,12 @@ export type StatefulMarkerData = `${string}\\${string}`;
 
 export interface Feature {
   /**
-   * Supported model familys, use {@link Array.includes} to check if a family is supported.
+   * Supported model familys, use {@link String.startsWith} to check if a family is supported.
    */
   supportedFamilys?: string[];
 
   /**
-   * Supported model IDs, use {@link Array.includes} to check if a model is supported.
+   * Supported model IDs, use {@link String.startsWith} to check if a model is supported.
    */
   supportedModels?: string[];
 

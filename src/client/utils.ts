@@ -114,11 +114,11 @@ export function matchProvider(url: string, pattern: ProviderPattern): boolean {
 }
 
 export function matchModelId(id: string, patterns: string[]): boolean {
-  return patterns.some((v) => id.includes(v));
+  return patterns.some((v) => id.startsWith(v));
 }
 
 export function matchModelFamily(family: string, patterns: string[]): boolean {
-  return patterns.some((v) => family.includes(v));
+  return patterns.some((v) => family.startsWith(v));
 }
 
 /**
