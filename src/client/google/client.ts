@@ -161,7 +161,7 @@ export class GoogleAIStudioProvider implements ApiProvider {
         thinkingConfig: useThinkingLevel
           ? {
               includeThoughts: false,
-              thinkingLevel: ThinkingLevel.THINKING_LEVEL_UNSPECIFIED,
+              thinkingLevel: ThinkingLevel.MINIMAL,
             }
           : {
               includeThoughts: false,
@@ -176,12 +176,14 @@ export class GoogleAIStudioProvider implements ApiProvider {
 
     if (thinking.budgetTokens !== undefined) {
       out.thinkingBudget = thinking.budgetTokens;
-    } else if (thinking.type === 'auto') {
-      out.thinkingBudget = -1;
-    }
-
-    if (thinking.effort) {
+    } else if (thinking.effort) {
       out.thinkingLevel = this.mapThinkingEffortToLevel(thinking.effort);
+    } else if (thinking.type === 'auto') {
+      if (useThinkingLevel) {
+        // use Default level
+      } else {
+        out.thinkingBudget = -1;
+      }
     }
 
     return { thinkingConfig: out };
