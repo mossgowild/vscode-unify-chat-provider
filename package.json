@@ -2,7 +2,7 @@
   "name": "vscode-unify-chat-provider",
   "displayName": "Unify Chat Provider",
   "description": "Integrate multiple LLM API providers into VS Code's GitHub Copilot Chat using the Language Model API.",
-  "version": "1.2.0",
+  "version": "2.0.0",
   "categories": [
     "AI",
     "Chat"
