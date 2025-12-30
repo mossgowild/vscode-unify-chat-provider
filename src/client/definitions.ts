@@ -1,6 +1,7 @@
 import { getBaseModelId } from '../model-id-utils';
 import { AnthropicProvider } from './anthropic/client';
-import { GoogleAIStudioProvider } from './google/client';
+import { GoogleAIStudioProvider } from './google/ai-studio-client';
+import { VertexAIProvider } from './google/vertex-ai-client';
 import { ProviderDefinition } from './interface';
 import { OllamaProvider } from './ollama/client';
 import { OpenAIChatCompletionProvider } from './openai/chat-completion-client';
@@ -11,6 +12,7 @@ import { matchProvider, matchModelFamily } from './utils';
 export type ProviderType =
   | 'anthropic'
   | 'google-ai-studio'
+  | 'google-vertex-ai'
   | 'openai-chat-completion'
   | 'openai-responses'
   | 'ollama';
@@ -29,6 +31,13 @@ export const PROVIDER_TYPES: Record<ProviderType, ProviderDefinition> = {
     description: '/v1beta/models:generateContent',
     supportMimics: [],
     class: GoogleAIStudioProvider,
+  },
+  'google-vertex-ai': {
+    type: 'google-vertex-ai',
+    label: 'Google Vertex AI',
+    description: '/v1beta1/models:generateContent',
+    supportMimics: [],
+    class: VertexAIProvider,
   },
   'openai-chat-completion': {
     type: 'openai-chat-completion',

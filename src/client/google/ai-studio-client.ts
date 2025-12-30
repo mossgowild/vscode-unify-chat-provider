@@ -43,10 +43,10 @@ import { FeatureId } from '../definitions';
 const TOOL_CALL_ID_PREFIX = 'google-tool:';
 
 export class GoogleAIStudioProvider implements ApiProvider {
-  private readonly baseUrl: string;
-  private readonly apiVersion: string;
+  protected readonly baseUrl: string;
+  protected readonly apiVersion: string;
 
-  constructor(private readonly config: ProviderConfig) {
+  constructor(protected readonly config: ProviderConfig) {
     const normalized = new URL(this.config.baseUrl);
     normalized.search = '';
     normalized.hash = '';
@@ -63,7 +63,7 @@ export class GoogleAIStudioProvider implements ApiProvider {
     this.baseUrl = normalized.toString().replace(/\/+$/, '');
   }
 
-  private buildHeaders(modelConfig?: ModelConfig): Record<string, string> {
+  protected buildHeaders(modelConfig?: ModelConfig): Record<string, string> {
     return mergeHeaders(
       this.config.apiKey,
       this.config.extraHeaders,
@@ -71,14 +71,14 @@ export class GoogleAIStudioProvider implements ApiProvider {
     );
   }
 
-  private buildExtraBody(modelConfig?: ModelConfig): Record<string, unknown> {
+  protected buildExtraBody(modelConfig?: ModelConfig): Record<string, unknown> {
     return {
       ...(this.config.extraBody ?? {}),
       ...(modelConfig?.extraBody ?? {}),
     };
   }
 
-  private createClient(
+  protected createClient(
     modelConfig: ModelConfig | undefined,
     streamEnabled: boolean,
   ): GoogleGenAI {

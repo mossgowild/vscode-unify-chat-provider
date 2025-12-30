@@ -413,6 +413,7 @@ vscode://SmallMain.vscode-unify-chat-provider/import-config?config=<input>&apiKe
 | :---------------------------------------------------------------------------------------------- | -------------------------------------------------------- |
 | [Open AI](https://openai.com/)                                                                  |
 | [Google AI Studio](https://aistudio.google.com/)                                                |                                                          |
+| [Google Vertex AI](https://cloud.google.com/vertex-ai)                                          | <li>[Auth](#google-vertex-ai-身份验证)                   |
 | [Anthropic](https://www.anthropic.com/)                                                         | <li>InterleavedThinking <li>FineGrainedToolStreaming     |
 | [xAI](https://docs.x.ai/)                                                                       |
 | [Hugging Face (Inference Providers)](https://huggingface.co/docs/inference-providers)           |
@@ -437,6 +438,35 @@ vscode://SmallMain.vscode-unify-chat-provider/import-config?config=<input>&apiKe
 | [Moonshot AI (China)](https://www.moonshot.cn/)                                                 | <li>ReasoningContent                                     |
 | [Moonshot AI (International)](https://www.moonshot.ai/)                                         | <li>ReasoningContent                                     |
 | [Moonshot AI (Coding Plan)](https://www.kimi.com/coding)                                        | <li>ReasoningContent                                     |
+
+### Google Vertex AI 身份验证
+
+Google Cloud Vertex AI 共有三种身份验证方式：
+
+- Application Default Credentials (ADC)
+
+  不支持该方式。
+
+- Service Account JSON key
+
+  支持，但是在配置时需要注意：
+
+  - 在 APIKey 字段中填写 JSON 文件路径，例如 `/path/to/your/keyfile.json`。
+  - 根据在平台中获取的 `project` 和 `location` 信息，在 `API Base URL` 字段中填写如下格式的地址：
+
+    ```
+    https://<location>-aiplatform.googleapis.com/v1/projects/<project>/locations/<location>
+    ```
+
+    例如：
+
+    ```
+    https://us-central1-aiplatform.googleapis.com/v1/projects/my-project/locations/us-central1
+    ```
+
+- Google Cloud API key
+
+  支持，只需要正确配置 `API Key` 即可。
 
 ## 模型支持表
 

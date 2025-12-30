@@ -184,6 +184,7 @@
                 "enum": [
                   "anthropic",
                   "google-ai-studio",
+                  "google-vertex-ai",
                   "openai-chat-completion",
                   "openai-responses",
                   "ollama"
@@ -191,6 +192,7 @@
                 "enumDescriptions": [
                   "Anthropic Messages API",
                   "Google AI Studio (Gemini API)",
+                  "Google Vertex AI",
                   "OpenAI Chat Completion API",
                   "OpenAI Responses API",
                   "Ollama Chat API"
