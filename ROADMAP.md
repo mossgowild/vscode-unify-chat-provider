@@ -6,7 +6,6 @@
 - Support monitoring of balance usage.
 - Embedded functionality similar to [CLIProxyAPI](https://github.com/router-for-me/CLIProxyAPI).
 - Context Indicator, official related issue：https://github.com/microsoft/vscode/issues/277871, https://github.com/microsoft/vscode/issues/277414
-- Multilingual support, and update the README_zh-CN.md.
 - Support more apps import:
   - RooCode
   - CherryStudio
