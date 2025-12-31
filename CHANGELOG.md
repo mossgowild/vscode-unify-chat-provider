@@ -1,5 +1,10 @@
 # Changelog
 
+## v2.1.4 - 2025-12-31
+
+### Fixes
+- codex migration does not read auth file (bfe6b38, SmallMain)
+
 ## v2.1.3 - 2025-12-31
 
 ### Fixes
