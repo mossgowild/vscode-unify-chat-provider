@@ -20,7 +20,7 @@ Integrate multiple LLM API providers into VS Code's GitHub Copilot Chat using th
 <br>
 <p align="center">
 <span>English</span> |
-<a href="./README_zh-CN.md">简体中文</a>
+<a href="https://github.com/smallmain/vscode-unify-chat-provider/blob/main/README_zh-CN.md">简体中文</a>
 </p>
 
 ## Features
@@ -63,7 +63,7 @@ The UI is integrated into the VS Code Command Palette for a more native experien
    - Select a command with mouse or arrow keys, then press Enter.
 
 <div align="center">
-  <img src="assets/screenshot-1.png" width="600" />
+  <img src="assets/screenshot-20.png" width="600" />
 </div>
 
 ### One-Click Migration
@@ -93,7 +93,7 @@ See the [Application Migration Support Table](#application-migration-support-tab
 3. Click `Save` to complete the import and start using the imported models in Copilot Chat.
 
    <div align="center">
-   <img src="assets/screenshot-3.png" width="600" />
+   <img src="assets/screenshot-23.png" width="600" />
    </div>
 
 ### One-Click Configuration
@@ -120,7 +120,7 @@ See the [Provider Support Table](#provider-support-table) for providers supporte
 4. Click `Save` to complete the import and start using the models in Copilot Chat.
 
    <div align="center">
-   <img src="assets/screenshot-5.png" width="600" />
+   <img src="assets/screenshot-22.png" width="600" />
    </div>
 
 ### Manual Configuration
@@ -175,7 +175,7 @@ This section uses DeepSeek as an example, adding the provider and two models.
 8. Click `Save` to finish. You can now use the models in Copilot Chat.
 
    <div align="center">
-   <img src="assets/screenshot-5.png" width="600" />
+   <img src="assets/screenshot-22.png" width="600" />
    </div>
 
 ## Manage Providers

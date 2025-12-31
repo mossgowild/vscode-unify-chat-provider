@@ -63,7 +63,7 @@ Unify Chat Provider
    - 使用鼠标点击或键盘的上下箭头键选择命令，按回车键执行所选命令。
 
 <div align="center">
-  <img src="assets/screenshot-1.png" width="600" />
+  <img src="assets/screenshot-13.png" width="600" />
 </div>
 
 ### 一键迁移
@@ -77,7 +77,7 @@ Unify Chat Provider
 1. 打开 VS Code 命令面板，搜索 `Unify Chat Provider: 从其他应用导入配置`。
 
    <div align="center">
-   <img src="assets/screenshot-2.png" width="600" />
+   <img src="assets/screenshot-14.png" width="600" />
    </div>
 
    - 界面会列出所有支持的应用或扩展，及其检测到的配置文件路径。
@@ -138,7 +138,7 @@ Unify Chat Provider
 1. 打开 VS Code 命令面板，搜索 `Unify Chat Provider: 添加供应商`。
 
    <div align="center">
-   <img src="assets/screenshot-6.png" width="600" />
+   <img src="assets/screenshot-15.png" width="600" />
    </div>
 
    - 该界面与 [供应商配置](#供应商配置) 界面相似，你可以阅读该界面的文档了解每个字段。
@@ -164,7 +164,7 @@ Unify Chat Provider
 6. 点击 `模型` 字段跳转到模型管理界面。
 
    <div align="center">
-   <img src="assets/screenshot-7.png" width="600" />
+   <img src="assets/screenshot-16.png" width="600" />
    </div>
 
 7. 选中 `自动拉取官方模型` 以启用自动拉取官方模型。
@@ -188,7 +188,7 @@ Unify Chat Provider
 打开 VS Code 命令面板，搜索 `Unify Chat Provider: 管理供应商`。
 
 <div align="center">
-<img src="assets/screenshot-8.png" width="600" />
+<img src="assets/screenshot-17.png" width="600" />
 </div>
 
 - `添加供应商`: 通过 [手动配置](#手动配置) 添加新的供应商。
@@ -208,7 +208,7 @@ Unify Chat Provider
 ### 供应商配置
 
 <div align="center">
-<img src="assets/screenshot-10.png" width="600" />
+<img src="assets/screenshot-18.png" width="600" />
 </div>
 
 - `模型`: 仅在添加或导入配置时存在该按钮，点击则进入 [模型列表](#模型列表) 界面。
@@ -227,7 +227,7 @@ Unify Chat Provider
 ### 模型列表
 
 <div align="center">
-<img src="assets/screenshot-9.png" width="600" />
+<img src="assets/screenshot-16.png" width="600" />
 </div>
 
 - `添加模型`: 进入 [手动添加模型](#手动添加模型) 界面。
@@ -263,7 +263,7 @@ Unify Chat Provider
 > 供应商的 API 接口不一定会返回模型的推荐参数，所以推荐参数将根据模型 ID 从内部数据库获取，支持的模型可查看 [模型支持表](#模型支持表)。
 
 <div align="center">
-<img src="assets/screenshot-7.png" width="600" />
+<img src="assets/screenshot-16.png" width="600" />
 </div>
 
 - 自动拉取的模型名称前面会有一个 `互联网` 图标以示区分。
@@ -274,7 +274,7 @@ Unify Chat Provider
 ### 模型配置
 
 <div align="center">
-<img src="assets/screenshot-11.png" width="600" />
+<img src="assets/screenshot-19.png" width="600" />
 </div>
 
 - `导出`: 导出该模型的配置，详细介绍请查看 [导入与导出](#导入与导出)。
