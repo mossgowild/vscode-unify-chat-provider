@@ -1,5 +1,10 @@
 # Changelog
 
+## v2.1.3 - 2025-12-31
+
+### Fixes
+- improve thinking level and budget handling in GoogleAIStudioProvider (0c83cbb, SmallMain)
+
 ## v2.1.2 - 2025-12-31
 
 ### Fixes
