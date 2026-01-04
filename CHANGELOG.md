@@ -1,5 +1,10 @@
 # Changelog
 
+## v2.1.5 - 2026-01-04
+
+### Fixes
+- log initialization message only when verbose mode is enabled (72b4fee, SmallMain)
+
 ## v2.1.4 - 2025-12-31
 
 ### Fixes
