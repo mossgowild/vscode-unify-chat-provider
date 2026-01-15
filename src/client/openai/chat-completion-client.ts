@@ -26,10 +26,12 @@ import {
   estimateTokenCount as sharedEstimateTokenCount,
   getToken,
   getTokenType,
+  getUnifiedUserAgent,
   isFeatureSupported,
   mergeHeaders,
   parseToolArguments,
   processUsage as sharedProcessUsage,
+  setUserAgentHeader,
 } from '../utils';
 import * as vscode from 'vscode';
 import {
@@ -69,7 +71,13 @@ export class OpenAIChatCompletionProvider implements ApiProvider {
     modelConfig?: ModelConfig,
   ): Record<string, string> {
     const token = getToken(credential);
-    const headers = mergeHeaders(token, this.config.extraHeaders, modelConfig?.extraHeaders);
+    const headers = mergeHeaders(
+      token,
+      this.config.extraHeaders,
+      modelConfig?.extraHeaders,
+    );
+
+    setUserAgentHeader(headers, getUnifiedUserAgent());
 
     if (token) {
       const tokenType = getTokenType(credential) ?? 'Bearer';

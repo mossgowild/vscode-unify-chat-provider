@@ -1,5 +1,6 @@
 import { getBaseModelId } from '../model-id-utils';
 import type { ProviderHttpLogger, RequestLogger } from '../logger';
+import * as vscode from 'vscode';
 import type { AuthTokenInfo } from '../auth/types';
 import { ModelConfig, PerformanceTrace, ProviderConfig } from '../types';
 import {
@@ -122,6 +123,37 @@ export function matchModelFamily(family: string, patterns: string[]): boolean {
   return patterns.some((v) => family.startsWith(v));
 }
 
+const EXTENSION_ID = 'SmallMain.vscode-unify-chat-provider';
+let cachedUnifiedUserAgent: string | undefined;
+
+export function getUnifiedUserAgent(): string {
+  if (cachedUnifiedUserAgent) {
+    return cachedUnifiedUserAgent;
+  }
+
+  const version =
+    vscode.extensions.getExtension(EXTENSION_ID)?.packageJSON?.version;
+
+  cachedUnifiedUserAgent =
+    typeof version === 'string' && version.trim()
+      ? `ucp/${version.trim()}`
+      : 'ucp/0.0.0';
+
+  return cachedUnifiedUserAgent;
+}
+
+export function setUserAgentHeader(
+  headers: Record<string, string | null>,
+  userAgent: string,
+): void {
+  for (const key of Object.keys(headers)) {
+    if (key.toLowerCase() === 'user-agent') {
+      return;
+    }
+  }
+  headers['User-Agent'] = userAgent;
+}
+
 /**
  * Check if a feature is supported by a specific model and provider.
  * @param featureId The feature ID to check
@@ -213,7 +245,9 @@ export function getToken(info: AuthTokenInfo | undefined): string | undefined {
   return info.token;
 }
 
-export function getTokenType(info: AuthTokenInfo | undefined): string | undefined {
+export function getTokenType(
+  info: AuthTokenInfo | undefined,
+): string | undefined {
   if (!info || info.kind === 'none') {
     return undefined;
   }

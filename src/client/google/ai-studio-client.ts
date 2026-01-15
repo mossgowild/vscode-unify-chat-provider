@@ -35,9 +35,11 @@ import {
   createFirstTokenRecorder,
   estimateTokenCount as sharedEstimateTokenCount,
   getToken,
+  getUnifiedUserAgent,
   mergeHeaders,
   processUsage as sharedProcessUsage,
   isFeatureSupported,
+  setUserAgentHeader,
 } from '../utils';
 import { randomUUID } from 'node:crypto';
 import { FeatureId } from '../definitions';
@@ -71,11 +73,15 @@ export class GoogleAIStudioProvider implements ApiProvider {
   ): Record<string, string> {
     const credentialValue = getToken(credential);
 
-    return mergeHeaders(
+    const headers = mergeHeaders(
       credentialValue,
       this.config.extraHeaders,
       modelConfig?.extraHeaders,
     );
+
+    setUserAgentHeader(headers, getUnifiedUserAgent());
+
+    return headers;
   }
 
   protected buildExtraBody(modelConfig?: ModelConfig): Record<string, unknown> {

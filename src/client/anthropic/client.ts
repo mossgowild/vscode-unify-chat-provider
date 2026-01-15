@@ -46,6 +46,8 @@ import {
   processUsage as sharedProcessUsage,
   getToken,
   getTokenType,
+  getUnifiedUserAgent,
+  setUserAgentHeader,
 } from '../utils';
 import type { AuthTokenInfo } from '../../auth/types';
 
@@ -123,13 +125,7 @@ export class AnthropicProvider implements ApiProvider {
       }
     }
 
-    // if use Anthropic/JS 0.71.2 as user agent, some provider will return error 403
-    const hasUserAgentHeader = Object.keys(headers).some(
-      (key) => key.toLowerCase() === 'user-agent',
-    );
-    if (!hasUserAgentHeader) {
-      headers['user-agent'] = 'claude-cli/2.1.2 (external, cli)';
-    }
+    setUserAgentHeader(headers, getUnifiedUserAgent());
 
     return headers;
   }
