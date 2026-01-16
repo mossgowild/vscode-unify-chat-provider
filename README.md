@@ -437,6 +437,7 @@ The providers listed below support [One-Click Configuration](#one-click-configur
 | [OpenCode Zen (OpenAI Responses)](https://opencode.ai/)                                         | <li>ReasoningContent                                     |
 | [OpenCode Zen (Anthropic Messages)](https://opencode.ai/)                                       | <li>InterleavedThinking <li>FineGrainedToolStreaming     |
 | [OpenCode Zen (Gemini)](https://opencode.ai/)                                                   |                                                          |
+| [Nvidia](https://build.nvidia.com/)                                                             |                                                          |
 | [Alibaba Cloud Model Studio (China)](https://www.aliyun.com/product/bailian)                    | <li>ThinkingParam3 <li>ReasoningContent                  |
 | [Alibaba Cloud Model Studio (Coding Plan)](https://www.aliyun.com/product/bailian)              | <li>ThinkingParam3 <li>ReasoningContent                  |
 | [Alibaba Cloud Model Studio (International)](https://www.alibabacloud.com/help/en/model-studio) | <li>ThinkingParam3 <li>ReasoningContent                  |

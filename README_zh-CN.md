@@ -423,6 +423,7 @@ vscode://SmallMain.vscode-unify-chat-provider/import-config?config=<input>&auth=
 | [OpenCode Zen (OpenAI Responses)](https://opencode.ai/)                               | <li>ReasoningContent                                     |
 | [OpenCode Zen (Anthropic Messages)](https://opencode.ai/)                             | <li>InterleavedThinking <li>FineGrainedToolStreaming     |
 | [OpenCode Zen (Gemini)](https://opencode.ai/)                                         |                                                          |
+| [英伟达](https://build.nvidia.com/)                                                   |                                                          |
 | [阿里云百炼平台 (中国站)](https://www.aliyun.com/product/bailian)                     | <li>ThinkingParam3 <li>ReasoningContent                  |
 | [阿里云百炼平台 (Coding Plan)](https://www.aliyun.com/product/bailian)                | <li>ThinkingParam3 <li>ReasoningContent                  |
 | [阿里云百炼平台 (国际站)](https://www.alibabacloud.com/help/en/model-studio)          | <li>ThinkingParam3 <li>ReasoningContent                  |

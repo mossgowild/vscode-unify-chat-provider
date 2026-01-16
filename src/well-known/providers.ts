@@ -147,6 +147,12 @@ export const WELL_KNOWN_PROVIDERS: ProviderConfig[] = [
     models: wellKnowns('gemini-3-pro', 'gemini-3-flash'),
   },
   {
+    name: 'Nvidia',
+    type: 'openai-chat-completion',
+    baseUrl: 'https://integrate.api.nvidia.com',
+    models: [],
+  },
+  {
     name: 'Alibaba Cloud Model Studio (China)',
     type: 'openai-chat-completion',
     baseUrl: 'https://dashscope.aliyuncs.com/compatible-mode/v1',

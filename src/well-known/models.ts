@@ -616,7 +616,7 @@ const _WELL_KNOWN_MODELS = [
   },
   {
     id: 'gpt-oss-120b',
-    alternativeIds: ['gpt-oss:120b'],
+    alternativeIds: ['gpt-oss:120b', 'openai/gpt-oss-120b'],
     name: 'GPT-OSS 120B',
     maxInputTokens: 131072,
     maxOutputTokens: 131072,
@@ -632,7 +632,7 @@ const _WELL_KNOWN_MODELS = [
   },
   {
     id: 'gpt-oss-20b',
-    alternativeIds: ['gpt-oss:20b', 'gpt-oss:latest'],
+    alternativeIds: ['gpt-oss:20b', 'gpt-oss:latest', 'openai/gpt-oss-20b'],
     name: 'GPT-OSS 20B',
     maxInputTokens: 131072,
     maxOutputTokens: 131072,
@@ -924,7 +924,7 @@ const _WELL_KNOWN_MODELS = [
   },
   {
     id: 'MiniMax-M2.1',
-    alternativeIds: ['minimax-m2.1-free'],
+    alternativeIds: ['minimax-m2.1-free', 'minimaxai/minimax-m2.1'],
     name: 'MiniMax-M2.1',
     maxInputTokens: 204800,
     maxOutputTokens: 102400,
@@ -955,6 +955,7 @@ const _WELL_KNOWN_MODELS = [
   },
   {
     id: 'MiniMax-M2',
+    alternativeIds: ['minimaxai/minimax-m2'],
     name: 'MiniMax-M2',
     maxInputTokens: 204800,
     maxOutputTokens: 102400,
@@ -997,7 +998,7 @@ const _WELL_KNOWN_MODELS = [
   },
   {
     id: 'deepseek-v3.2',
-    alternativeIds: ['ark-code-latest'],
+    alternativeIds: ['ark-code-latest', 'deepseek-ai/deepseek-v3.2'],
     name: 'DeepSeek V3.2',
     maxInputTokens: 128000,
     maxOutputTokens: 8000,
@@ -1043,6 +1044,7 @@ const _WELL_KNOWN_MODELS = [
   },
   {
     id: 'deepseek-v3.1',
+    alternativeIds: ['deepseek-ai/deepseek-v3.1'],
     name: 'DeepSeek V3.1',
     maxInputTokens: 128000,
     maxOutputTokens: 8000,
@@ -1058,6 +1060,7 @@ const _WELL_KNOWN_MODELS = [
   },
   {
     id: 'deepseek-v3.1-terminus',
+    alternativeIds: ['deepseek-ai/deepseek-v3.1-terminus'],
     name: 'DeepSeek V3.1 Terminus',
     maxInputTokens: 128000,
     maxOutputTokens: 8000,
@@ -1097,6 +1100,7 @@ const _WELL_KNOWN_MODELS = [
   },
   {
     id: 'deepseek-r1',
+    alternativeIds: ['deepseek-ai/deepseek-r1'],
     name: 'DeepSeek R1',
     maxInputTokens: 128000,
     maxOutputTokens: 32768,
@@ -1112,6 +1116,7 @@ const _WELL_KNOWN_MODELS = [
   },
   {
     id: 'deepseek-r1-0528',
+    alternativeIds: ['deepseek-ai/deepseek-r1-0528'],
     name: 'DeepSeek R1 (0528)',
     maxInputTokens: 128000,
     maxOutputTokens: 32768,
@@ -1211,6 +1216,7 @@ const _WELL_KNOWN_MODELS = [
   },
   {
     id: 'kimi-k2-thinking',
+    alternativeIds: ['moonshotai/kimi-k2-thinking'],
     name: 'Kimi K2 Thinking',
     maxInputTokens: 256000,
     maxOutputTokens: 128000,
@@ -1241,7 +1247,7 @@ const _WELL_KNOWN_MODELS = [
   },
   {
     id: 'kimi-k2-0905-preview',
-    alternativeIds: ['kimi-k2'],
+    alternativeIds: ['kimi-k2', 'moonshotai/kimi-k2-instruct', 'moonshotai/kimi-k2-instruct-0905'],
     name: 'Kimi K2 0905 Preview',
     maxInputTokens: 256000,
     maxOutputTokens: 128000,
@@ -1590,7 +1596,7 @@ const _WELL_KNOWN_MODELS = [
   },
   {
     id: 'qwq-32b',
-    alternativeIds: ['qwq:32b', 'qwq:latest'],
+    alternativeIds: ['qwq:32b', 'qwq:latest', 'qwen/qwq-32b'],
     name: 'QwQ 32B',
     maxInputTokens: 131072,
     maxOutputTokens: 8192,
@@ -1663,7 +1669,7 @@ const _WELL_KNOWN_MODELS = [
   },
   {
     id: 'qwen2-7b-instruct',
-    alternativeIds: ['qwen2:7b'],
+    alternativeIds: ['qwen2:7b', 'qwen/qwen2-7b-instruct'],
     name: 'Qwen2 7B Instruct',
     stream: true,
   },
@@ -1708,7 +1714,7 @@ const _WELL_KNOWN_MODELS = [
   },
   {
     id: 'qwen2.5-7b-instruct',
-    alternativeIds: ['qwen2.5:7b', 'qwen2.5:latest'],
+    alternativeIds: ['qwen2.5:7b', 'qwen2.5:latest', 'qwen/qwen2.5-7b-instruct'],
     name: 'Qwen2.5 7B Instruct',
     stream: true,
   },
@@ -1774,7 +1780,7 @@ const _WELL_KNOWN_MODELS = [
   },
   {
     id: 'qwen2.5-coder-7b-instruct',
-    alternativeIds: ['qwen2.5-coder:7b'],
+    alternativeIds: ['qwen2.5-coder:7b', 'qwen/qwen2.5-coder-7b-instruct'],
     name: 'Qwen2.5 Coder 7B Instruct',
     stream: true,
     capabilities: {
@@ -1794,7 +1800,7 @@ const _WELL_KNOWN_MODELS = [
   },
   {
     id: 'qwen2.5-coder-32b-instruct',
-    alternativeIds: ['qwen2.5-coder:32b'],
+    alternativeIds: ['qwen2.5-coder:32b', 'qwen/qwen2.5-coder-32b-instruct'],
     name: 'Qwen2.5 Coder 32B Instruct',
     stream: true,
     capabilities: {
@@ -1919,7 +1925,7 @@ const _WELL_KNOWN_MODELS = [
   },
   {
     id: 'qwen3-235b-a22b',
-    alternativeIds: ['qwen3:235b'],
+    alternativeIds: ['qwen3:235b', 'qwen/qwen3-235b-a22b'],
     name: 'Qwen3 235B A22B',
     maxInputTokens: 129024,
     stream: true,
@@ -1929,6 +1935,7 @@ const _WELL_KNOWN_MODELS = [
   },
   {
     id: 'qwen3-next-80b-a3b-thinking',
+    alternativeIds: ['qwen/qwen3-next-80b-a3b-thinking'],
     name: 'Qwen3 Next 80B A3B Thinking',
     maxInputTokens: 131072,
     maxOutputTokens: 32768,
@@ -1939,7 +1946,7 @@ const _WELL_KNOWN_MODELS = [
   },
   {
     id: 'qwen3-next-80b-a3b-instruct',
-    alternativeIds: ['qwen3-next:80b'],
+    alternativeIds: ['qwen3-next:80b', 'qwen/qwen3-next-80b-a3b-instruct'],
     name: 'Qwen3 Next 80B A3B Instruct',
     maxInputTokens: 129024,
     stream: true,
@@ -1978,7 +1985,7 @@ const _WELL_KNOWN_MODELS = [
   },
   {
     id: 'qwen3-coder-480b-a35b-instruct',
-    alternativeIds: ['qwen3-coder:480b', 'qwen3-coder'],
+    alternativeIds: ['qwen3-coder:480b', 'qwen3-coder', 'qwen/qwen3-coder-480b-a35b-instruct'],
     name: 'Qwen3 Coder 480B A35B Instruct',
     maxInputTokens: 262144,
     maxOutputTokens: 65536,
@@ -2161,7 +2168,7 @@ const _WELL_KNOWN_MODELS = [
   },
   {
     id: 'glm-4.7',
-    alternativeIds: ['glm-4.7-free'],
+    alternativeIds: ['glm-4.7-free', 'z-ai/glm4.7'],
     name: 'GLM-4.7',
     maxInputTokens: 200000,
     maxOutputTokens: 128000,
