@@ -1,5 +1,21 @@
 # Changelog
 
+## v3.0.0 - 2026-01-16
+
+### Features
+- add support for oauth, and some optimizations and fixes (8f4ae2e, SmallMain)
+- add provider Alibaba Cloud Model Studio (Coding Plan) (193b880, SmallMain)
+
+### Fixes
+- remove unused import from auths.ts (e241932, SmallMain)
+- remove deprecated well-known auth presets for Google and Azure (d39eac7, SmallMain)
+- update Chinese translations for Alibaba Cloud and other providers (7a48d35, SmallMain)
+- pinned user-agent header to avoid 403 errors with openai/anthropic/google provider (da60247, SmallMain)
+- initialize capabilities in createModelDraft when no existing model is provided (481dace, SmallMain)
+
+### Chores
+- add l10n scripts (4bb7a74, SmallMain)
+
 ## v2.1.6 - 2026-01-07
 
 ### Fixes
