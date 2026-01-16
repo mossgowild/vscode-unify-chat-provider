@@ -123,7 +123,7 @@ export const WELL_KNOWN_PROVIDERS: ProviderConfig[] = [
     type: 'openai-responses',
     baseUrl: 'https://ark.cn-beijing.volces.com/api/v3',
     models: wellKnowns(
-      'doubao-seed-1-8-251215',
+      'doubao-seed-1-8-251228',
       'doubao-seed-code-preview-251028',
       'doubao-seed-1-6-lite-251015',
       'doubao-seed-1-6-flash-250828',
@@ -141,7 +141,7 @@ export const WELL_KNOWN_PROVIDERS: ProviderConfig[] = [
     type: 'openai-responses',
     baseUrl: 'https://ark.ap-southeast.bytepluses.com/api/v3',
     models: wellKnowns(
-      'doubao-seed-1-8-251215',
+      'doubao-seed-1-8-251228',
       'doubao-seed-code-preview-251028',
       'doubao-seed-1-6-lite-251015',
       'doubao-seed-1-6-flash-250828',
