@@ -1,5 +1,15 @@
 # Changelog
 
+## v3.1.0 - 2026-01-16
+
+### Features
+- add OpenCode Zen providers to localization files (7efaff0, SmallMain)
+- add OpenCode Zen providers and update model alternative IDs (9581f76, SmallMain)
+
+### Fixes
+- update Doubao Seed ID to the latest version in providers.ts (7461836, SmallMain)
+- update Doubao Seed ID and add Kimi K2 0711 Preview model configuration (abab2ba, SmallMain)
+
 ## v3.0.0 - 2026-01-16
 
 ### Features
