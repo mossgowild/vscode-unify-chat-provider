@@ -1247,7 +1247,11 @@ const _WELL_KNOWN_MODELS = [
   },
   {
     id: 'kimi-k2-0905-preview',
-    alternativeIds: ['kimi-k2', 'moonshotai/kimi-k2-instruct', 'moonshotai/kimi-k2-instruct-0905'],
+    alternativeIds: [
+      'kimi-k2',
+      'moonshotai/kimi-k2-instruct',
+      'moonshotai/kimi-k2-instruct-0905',
+    ],
     name: 'Kimi K2 0905 Preview',
     maxInputTokens: 256000,
     maxOutputTokens: 128000,
@@ -1714,7 +1718,11 @@ const _WELL_KNOWN_MODELS = [
   },
   {
     id: 'qwen2.5-7b-instruct',
-    alternativeIds: ['qwen2.5:7b', 'qwen2.5:latest', 'qwen/qwen2.5-7b-instruct'],
+    alternativeIds: [
+      'qwen2.5:7b',
+      'qwen2.5:latest',
+      'qwen/qwen2.5-7b-instruct',
+    ],
     name: 'Qwen2.5 7B Instruct',
     stream: true,
   },
@@ -1985,7 +1993,11 @@ const _WELL_KNOWN_MODELS = [
   },
   {
     id: 'qwen3-coder-480b-a35b-instruct',
-    alternativeIds: ['qwen3-coder:480b', 'qwen3-coder', 'qwen/qwen3-coder-480b-a35b-instruct'],
+    alternativeIds: [
+      'qwen3-coder:480b',
+      'qwen3-coder',
+      'qwen/qwen3-coder-480b-a35b-instruct',
+    ],
     name: 'Qwen3 Coder 480B A35B Instruct',
     maxInputTokens: 262144,
     maxOutputTokens: 65536,
@@ -2533,7 +2545,7 @@ const _WELL_KNOWN_MODELS = [
   },
   {
     id: 'gemini-3-pro-preview',
-    alternativeIds: ['gemini-3-pro', 'gemini-3-pro-high'],
+    alternativeIds: ['gemini-3-pro'],
     name: 'Gemini 3 Pro Preview',
     maxInputTokens: 1048576,
     maxOutputTokens: 65536,
@@ -2548,7 +2560,7 @@ const _WELL_KNOWN_MODELS = [
   },
   {
     id: 'gemini-3-flash-preview',
-    alternativeIds: ['gemini-3-flash', 'gemini-3-flash-preview'],
+    alternativeIds: ['gemini-3-flash'],
     name: 'Gemini 3 Flash Preview',
     maxInputTokens: 1048576,
     maxOutputTokens: 65536,

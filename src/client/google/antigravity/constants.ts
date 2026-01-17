@@ -1,11 +1,11 @@
 export const CODE_ASSIST_ENDPOINT_FALLBACKS = [
   'https://daily-cloudcode-pa.sandbox.googleapis.com',
-  'https://autopush-cloudcode-pa.sandbox.googleapis.com',
-  'https://cloudcode-pa.googleapis.com',
+  // 'https://autopush-cloudcode-pa.sandbox.googleapis.com',
+  // 'https://cloudcode-pa.googleapis.com',
 ] as const;
 
 export const CODE_ASSIST_HEADERS = {
-  'User-Agent': 'antigravity/1.11.5 windows/amd64',
+  'User-Agent': 'google-api-nodejs-client/9.15.1',
   'X-Goog-Api-Client': 'google-cloud-sdk vscode_cloudshelleditor/0.1',
   'Client-Metadata':
     '{"ideType":"IDE_UNSPECIFIED","platform":"PLATFORM_UNSPECIFIED","pluginType":"GEMINI"}',

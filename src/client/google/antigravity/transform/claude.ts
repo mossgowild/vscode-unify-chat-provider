@@ -4,6 +4,7 @@ import { cacheToolSchemas } from '../tool-schema-cache';
 import {
   applyAntigravitySystemInstruction,
   normalizeThinkingConfig,
+  normalizeAntigravitySystemInstruction,
 } from '../request-helpers';
 import {
   cacheThoughtSignature,
@@ -121,6 +122,8 @@ export function transformClaudeRequest(
     requestPayload['systemInstruction'] = requestPayload['system_instruction'];
     delete requestPayload['system_instruction'];
   }
+
+  normalizeAntigravitySystemInstruction(requestPayload);
 
   applyAntigravitySystemInstruction(requestPayload, context.model);
 

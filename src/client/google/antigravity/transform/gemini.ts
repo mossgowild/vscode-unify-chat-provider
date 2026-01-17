@@ -3,6 +3,7 @@ import { cacheToolSchemas, sanitizeToolNameForGemini } from '../tool-schema-cach
 import {
   applyAntigravitySystemInstruction,
   normalizeThinkingConfig,
+  normalizeAntigravitySystemInstruction,
 } from '../request-helpers';
 import { getCachedThoughtSignature } from '../thought-signature-cache';
 
@@ -440,6 +441,8 @@ export function transformGeminiRequest(
     requestPayload['systemInstruction'] = requestPayload['system_instruction'];
     delete requestPayload['system_instruction'];
   }
+
+  normalizeAntigravitySystemInstruction(requestPayload);
 
   const extraBody = requestPayload['extra_body'];
   const cachedContentFromExtra = isRecord(extraBody)

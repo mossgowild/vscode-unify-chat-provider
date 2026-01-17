@@ -7,6 +7,101 @@ function isRecord(value: unknown): value is Record<string, unknown> {
   return !!value && typeof value === 'object' && !Array.isArray(value);
 }
 
+type NormalizedSystemInstruction = {
+  role?: string;
+  parts: Array<Record<string, unknown>>;
+};
+
+function normalizeSystemInstructionParts(
+  value: unknown,
+): NormalizedSystemInstruction | undefined {
+  if (typeof value === 'string') {
+    const trimmed = value.trim();
+    return trimmed.length > 0 ? { parts: [{ text: trimmed }] } : undefined;
+  }
+
+  if (Array.isArray(value)) {
+    const parts: Array<Record<string, unknown>> = [];
+    for (const item of value) {
+      if (typeof item === 'string') {
+        const trimmed = item.trim();
+        if (trimmed.length > 0) {
+          parts.push({ text: trimmed });
+        }
+        continue;
+      }
+      if (isRecord(item)) {
+        if (Object.keys(item).length === 1 && typeof item['text'] === 'string') {
+          const trimmed = item['text'].trim();
+          if (trimmed.length === 0) {
+            continue;
+          }
+        }
+        parts.push(item);
+      }
+    }
+    return parts.length > 0 ? { parts } : undefined;
+  }
+
+  if (!isRecord(value)) {
+    return undefined;
+  }
+
+  const roleRaw = value['role'];
+  const role = typeof roleRaw === 'string' && roleRaw.trim().length > 0 ? roleRaw : undefined;
+
+  const partsRaw = value['parts'];
+  if (Array.isArray(partsRaw)) {
+    const parts: Array<Record<string, unknown>> = [];
+    for (const item of partsRaw) {
+      if (typeof item === 'string') {
+        const trimmed = item.trim();
+        if (trimmed.length > 0) {
+          parts.push({ text: trimmed });
+        }
+        continue;
+      }
+      if (isRecord(item)) {
+        if (Object.keys(item).length === 1 && typeof item['text'] === 'string') {
+          const trimmed = item['text'].trim();
+          if (trimmed.length === 0) {
+            continue;
+          }
+        }
+        parts.push(item);
+      }
+    }
+    return parts.length > 0 ? { role, parts } : undefined;
+  }
+
+  if (Object.keys(value).length === 1 && typeof value['text'] === 'string') {
+    const trimmed = value['text'].trim();
+    if (trimmed.length === 0) {
+      return undefined;
+    }
+  }
+
+  return { parts: [value] };
+}
+
+export function normalizeAntigravitySystemInstruction(
+  payload: Record<string, unknown>,
+): void {
+  if (!('systemInstruction' in payload)) {
+    return;
+  }
+
+  const normalized = normalizeSystemInstructionParts(payload['systemInstruction']);
+  if (!normalized) {
+    delete payload['systemInstruction'];
+    return;
+  }
+
+  payload['systemInstruction'] = normalized.role
+    ? { role: normalized.role, parts: normalized.parts }
+    : { parts: normalized.parts };
+}
+
 export function applyAntigravitySystemInstruction(
   payload: Record<string, unknown>,
   model: string,
@@ -186,4 +281,3 @@ export function rewriteGeminiRateLimitError(body: GeminiApiBody): GeminiApiBody 
     },
   };
 }
-
