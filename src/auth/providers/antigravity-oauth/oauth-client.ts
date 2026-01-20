@@ -6,6 +6,8 @@ import {
   ANTIGRAVITY_SCOPES,
   CODE_ASSIST_ENDPOINT_FALLBACKS,
   CODE_ASSIST_HEADERS,
+  CODE_ASSIST_LOAD_ENDPOINTS,
+  GEMINI_CLI_HEADERS,
   GOOGLE_OAUTH_AUTH_URL,
   GOOGLE_OAUTH_TOKEN_URL,
   GOOGLE_USERINFO_URL,
@@ -84,6 +86,22 @@ type TokenResponse = {
 
 type UserInfo = { email?: string };
 
+const FETCH_TIMEOUT_MS = 10_000;
+
+async function fetchWithTimeout(
+  url: string,
+  options: RequestInit,
+  timeoutMs = FETCH_TIMEOUT_MS,
+): Promise<Response> {
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), timeoutMs);
+  try {
+    return await fetch(url, { ...options, signal: controller.signal });
+  } finally {
+    clearTimeout(timeout);
+  }
+}
+
 export async function fetchAccountInfo(
   accessToken: string,
 ): Promise<AntigravityAccountInfo> {
@@ -91,15 +109,21 @@ export async function fetchAccountInfo(
   const headers: Record<string, string> = {
     Authorization: `Bearer ${accessToken}`,
     'Content-Type': 'application/json',
-    ...CODE_ASSIST_HEADERS,
+    'User-Agent': GEMINI_CLI_HEADERS['User-Agent'],
+    'X-Goog-Api-Client': GEMINI_CLI_HEADERS['X-Goog-Api-Client'],
+    'Client-Metadata': CODE_ASSIST_HEADERS['Client-Metadata'],
   };
 
   let detectedTier: AntigravityTier = 'free';
 
-  for (const baseEndpoint of CODE_ASSIST_ENDPOINT_FALLBACKS) {
+  const loadEndpoints = Array.from(
+    new Set<string>([...CODE_ASSIST_LOAD_ENDPOINTS, ...CODE_ASSIST_ENDPOINT_FALLBACKS]),
+  );
+
+  for (const baseEndpoint of loadEndpoints) {
     try {
       authLog.verbose('antigravity-client', `Trying endpoint: ${baseEndpoint}`);
-      const response = await fetch(`${baseEndpoint}/v1internal:loadCodeAssist`, {
+      const response = await fetchWithTimeout(`${baseEndpoint}/v1internal:loadCodeAssist`, {
         method: 'POST',
         headers,
         body: JSON.stringify({
@@ -200,7 +224,11 @@ export async function exchangeAntigravity(options: {
     const tokenResponse = await fetch(GOOGLE_OAUTH_TOKEN_URL, {
       method: 'POST',
       headers: {
-        'Content-Type': 'application/x-www-form-urlencoded',
+        'Content-Type': 'application/x-www-form-urlencoded;charset=UTF-8',
+        Accept: '*/*',
+        'Accept-Encoding': 'gzip, deflate, br',
+        'User-Agent': GEMINI_CLI_HEADERS['User-Agent'],
+        'X-Goog-Api-Client': GEMINI_CLI_HEADERS['X-Goog-Api-Client'],
       },
       body: new URLSearchParams({
         client_id: ANTIGRAVITY_CLIENT_ID,
@@ -242,6 +270,8 @@ export async function exchangeAntigravity(options: {
     const userInfoResponse = await fetch(GOOGLE_USERINFO_URL, {
       headers: {
         Authorization: `Bearer ${accessToken}`,
+        'User-Agent': GEMINI_CLI_HEADERS['User-Agent'],
+        'X-Goog-Api-Client': GEMINI_CLI_HEADERS['X-Goog-Api-Client'],
       },
     });
 
@@ -280,7 +310,11 @@ export async function refreshAccessToken(options: {
     const response = await fetch(GOOGLE_OAUTH_TOKEN_URL, {
       method: 'POST',
       headers: {
-        'Content-Type': 'application/x-www-form-urlencoded',
+        'Content-Type': 'application/x-www-form-urlencoded;charset=UTF-8',
+        Accept: '*/*',
+        'Accept-Encoding': 'gzip, deflate, br',
+        'User-Agent': GEMINI_CLI_HEADERS['User-Agent'],
+        'X-Goog-Api-Client': GEMINI_CLI_HEADERS['X-Goog-Api-Client'],
       },
       body: new URLSearchParams({
         client_id: ANTIGRAVITY_CLIENT_ID,

@@ -77,38 +77,66 @@ export async function performAntigravityAuthorization(
     return parseCallbackFromUrl(parsed);
   };
 
-  return await new Promise<CallbackResult | null>((resolve) => {
-    const server = createServer((req, res) => {
-      const reqUrl = req.url ?? '';
-      const parsed = parseUrlOrNull(`http://localhost${reqUrl}`);
-      if (!parsed || parsed.pathname !== ANTIGRAVITY_REDIRECT_PATH) {
-        res.statusCode = 404;
-        res.setHeader('Content-Type', 'text/plain; charset=utf-8');
-        res.end('Not Found');
-        return;
-      }
+  return await vscode.window.withProgress(
+    {
+      location: vscode.ProgressLocation.Notification,
+      title: t('Waiting for authorization...'),
+      cancellable: true,
+    },
+    async (progress, cancellationToken) => {
+      progress.report({ message: t('Complete authorization in your browser') });
 
-      const result = parseCallbackFromUrl(parsed);
-      res.statusCode = 200;
-      res.setHeader('Content-Type', 'text/html; charset=utf-8');
-      res.end(
-        renderHtml(
-          result.type === 'success'
-            ? 'Authentication complete. You may close this tab.'
-            : 'Authentication failed. You may close this tab.',
-        ),
-      );
+      return await new Promise<CallbackResult | null>((resolve) => {
+        let resolved = false;
+        const doResolve = (result: CallbackResult | null): void => {
+          if (resolved) return;
+          resolved = true;
+          cancelSubscription.dispose();
+          resolve(result);
+        };
 
-      server.close(() => {
-        resolve(result);
+        const cancelSubscription = cancellationToken.onCancellationRequested(() => {
+          server.close(() => {
+            doResolve(null);
+          });
+        });
+
+        const server = createServer((req, res) => {
+          const reqUrl = req.url ?? '';
+          const parsed = parseUrlOrNull(`http://localhost${reqUrl}`);
+          if (!parsed || parsed.pathname !== ANTIGRAVITY_REDIRECT_PATH) {
+            res.statusCode = 404;
+            res.setHeader('Content-Type', 'text/plain; charset=utf-8');
+            res.end('Not Found');
+            return;
+          }
+
+          const result = parseCallbackFromUrl(parsed);
+          res.statusCode = 200;
+          res.setHeader('Content-Type', 'text/html; charset=utf-8');
+          res.end(
+            renderHtml(
+              result.type === 'success'
+                ? 'Authentication complete. You may close this tab.'
+                : 'Authentication failed. You may close this tab.',
+            ),
+          );
+
+          // Close server and resolve immediately - don't wait for close callback
+          // as it may not fire in all cases
+          setImmediate(() => {
+            server.close();
+            doResolve(result);
+          });
+        });
+
+        server.on('error', async () => {
+          server.close();
+          doResolve(await manualFallback());
+        });
+
+        server.listen(ANTIGRAVITY_CALLBACK_PORT, 'localhost');
       });
-    });
-
-    server.on('error', async () => {
-      server.close();
-      resolve(await manualFallback());
-    });
-
-    server.listen(ANTIGRAVITY_CALLBACK_PORT, 'localhost');
-  });
+    },
+  );
 }

@@ -395,10 +395,19 @@ export class AntigravityOAuthProvider implements AuthProvider {
     }
 
     authLog.verbose(`${this.context.providerId}:antigravity-oauth`, 'Exchanging authorization code for tokens');
-    const exchanged = await exchangeAntigravity({
-      code: callbackResult.code,
-      state: callbackResult.state,
-    });
+    const exchanged = await vscode.window.withProgress(
+      {
+        location: vscode.ProgressLocation.Notification,
+        title: t('Exchanging code for token...'),
+        cancellable: false,
+      },
+      async () => {
+        return await exchangeAntigravity({
+          code: callbackResult.code,
+          state: callbackResult.state,
+        });
+      },
+    );
 
     if (exchanged.type === 'failed') {
       authLog.error(`${this.context.providerId}:antigravity-oauth`, `Token exchange failed: ${exchanged.error}`);
@@ -431,6 +440,7 @@ export class AntigravityOAuthProvider implements AuthProvider {
     await this.persistConfig(nextConfig);
     this._onDidChangeStatus.fire({ status: 'valid' });
 
+    vscode.window.showInformationMessage(t('Authorization successful!'));
     authLog.verbose(`${this.context.providerId}:antigravity-oauth`, `Configuration successful (email: ${exchanged.email}, tier: ${exchanged.tier})`);
     return { success: true, config: nextConfig };
   }
