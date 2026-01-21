@@ -462,8 +462,6 @@ function normalizeToolParametersSchema(
 
 type Gemini3ThinkingLevel = 'minimal' | 'low' | 'medium' | 'high';
 
-const GEMINI_3_TIER_SUFFIX_PATTERN = /-(minimal|low|medium|high)$/i;
-const ANTIGRAVITY_MODEL_PREFIX_PATTERN = /^antigravity-/i;
 const IMAGE_MODEL_PATTERN = /image|imagen/i;
 
 function mapThinkingEffortToGemini3ThinkingLevel(
@@ -487,71 +485,46 @@ function mapThinkingEffortToGemini3ThinkingLevel(
 function resolveAntigravityModelForRequest(
   modelId: string,
   preferredGemini3ThinkingLevel?: Gemini3ThinkingLevel,
+  thinkingEnabled?: boolean,
 ): {
   requestModelId: string;
   gemini3ThinkingLevel?: Gemini3ThinkingLevel;
 } {
   const trimmed = modelId.trim();
-  const withoutPrefix = trimmed.replace(ANTIGRAVITY_MODEL_PREFIX_PATTERN, '');
-  const maybeGemini3 = withoutPrefix.toLowerCase().includes('gemini-3');
+  const modelLower = trimmed.toLowerCase();
 
-  // Antigravity model resolver strips Gemini CLI -preview suffixes.
-  const withoutPreview = maybeGemini3
-    ? withoutPrefix.replace(/-preview$/i, '')
-    : withoutPrefix;
-
-  const tierMatch = withoutPreview.match(GEMINI_3_TIER_SUFFIX_PATTERN);
-  const tier = ((): Gemini3ThinkingLevel | undefined => {
-    const raw = tierMatch?.[1];
-    if (!raw) {
-      return undefined;
-    }
-    const lower = raw.toLowerCase();
-    switch (lower) {
-      case 'minimal':
-      case 'low':
-      case 'medium':
-      case 'high':
-        return lower;
-      default:
-        return undefined;
-    }
-  })();
-
-  const baseName = tier
-    ? withoutPreview.replace(GEMINI_3_TIER_SUFFIX_PATTERN, '')
-    : withoutPreview;
-  const baseLower = baseName.toLowerCase();
-
-  const isGemini3 = baseLower.includes('gemini-3');
-  const isGemini3Pro = baseLower.startsWith('gemini-3-pro');
-  const isGemini3Flash = baseLower.startsWith('gemini-3-flash');
-
-  if (!isGemini3) {
-    return { requestModelId: withoutPreview };
+  // Handle Claude models with dynamic -thinking suffix
+  if (modelLower.includes('claude')) {
+    const isOpus = modelLower.includes('opus');
+    const shouldAddThinking = isOpus || thinkingEnabled === true;
+    const requestModelId = shouldAddThinking ? `${trimmed}-thinking` : trimmed;
+    return { requestModelId };
   }
 
-  // Default thinking level for Gemini 3 models is low in the reference project.
+  // Handle Gemini 3 models
+  const isGemini3 = modelLower.includes('gemini-3');
+  if (!isGemini3) {
+    return { requestModelId: trimmed };
+  }
+
+  // Default thinking level for Gemini 3 models is high.
   const effectiveLevel: Gemini3ThinkingLevel =
-    preferredGemini3ThinkingLevel ?? tier ?? 'low';
+    preferredGemini3ThinkingLevel ?? 'high';
+
+  const isGemini3Pro = modelLower.startsWith('gemini-3-pro');
 
   if (isGemini3Pro) {
-    // Antigravity requires tier suffix for Gemini 3 Pro. Default to -low.
-    const isImageModel = IMAGE_MODEL_PATTERN.test(withoutPreview);
+    // Antigravity requires tier suffix for Gemini 3 Pro. Default to -high.
+    const isImageModel = IMAGE_MODEL_PATTERN.test(trimmed);
     const requestModelId = isImageModel
-      ? withoutPreview
-      : `${baseName}-${effectiveLevel}`;
+      ? trimmed
+      : `${trimmed}-${effectiveLevel}`;
     return { requestModelId, gemini3ThinkingLevel: effectiveLevel };
-  }
-
-  if (isGemini3Flash) {
-    // Antigravity uses bare model name + thinkingLevel for Gemini 3 Flash.
-    return { requestModelId: baseName, gemini3ThinkingLevel: effectiveLevel };
   }
 
   // Other Gemini 3 models: keep as-is, but still expose default thinkingLevel.
   return {
-    requestModelId: withoutPreview,
+    requestModelId: trimmed,
     gemini3ThinkingLevel: effectiveLevel,
   };
 }
@@ -600,7 +573,7 @@ export class GoogleAntigravityProvider extends GoogleAIStudioProvider {
   private buildAntigravityHeaders(
     credential: AuthTokenInfo,
     modelConfig?: ModelConfig,
-    options?: { streaming?: boolean },
+    options?: { streaming?: boolean; thinkingEnabled?: boolean },
   ): Record<string, string> {
     const token = getToken(credential);
     if (!token) {
@@ -651,7 +624,7 @@ export class GoogleAntigravityProvider extends GoogleAIStudioProvider {
       // Enable interleaved thinking streaming for Claude thinking models.
       if (
         modelConfig?.id.toLowerCase().includes('claude') &&
-        modelConfig.id.toLowerCase().includes('thinking')
+        options.thinkingEnabled
       ) {
         const headerKey = Object.keys(headers).find(
           (k) => k.toLowerCase() === 'anthropic-beta',
@@ -791,7 +764,11 @@ export class GoogleAntigravityProvider extends GoogleAIStudioProvider {
    */
   private normalizeClaudeThinkingToolHistory(contents: Content[]): void {
     for (const content of contents) {
-      if (!content || content.role !== 'model' || !Array.isArray(content.parts)) {
+      if (
+        !content ||
+        content.role !== 'model' ||
+        !Array.isArray(content.parts)
+      ) {
         continue;
       }
 
@@ -1012,9 +989,13 @@ export class GoogleAntigravityProvider extends GoogleAIStudioProvider {
       model.thinking.effort !== 'none'
         ? mapThinkingEffortToGemini3ThinkingLevel(model.thinking.effort)
         : undefined;
+    const thinkingEnabled =
+      model.thinking &&
+      (model.thinking.type === 'enabled' || model.thinking.type === 'auto');
     const resolvedModel = resolveAntigravityModelForRequest(
       requestedModelId,
       preferredGemini3ThinkingLevel,
+      thinkingEnabled,
     );
 
     const { systemInstruction, contents } = this.convertMessages(
@@ -1031,8 +1012,7 @@ export class GoogleAntigravityProvider extends GoogleAIStudioProvider {
     );
 
     const modelIdLower = resolvedModel.requestModelId.toLowerCase();
-    const isClaudeThinking =
-      modelIdLower.includes('claude') && modelIdLower.includes('thinking');
+    const isClaudeThinking = modelIdLower.includes('claude') && thinkingEnabled;
     if (isClaudeThinking) {
       this.normalizeClaudeThinkingToolHistory(contents);
     }
@@ -1132,6 +1112,7 @@ export class GoogleAntigravityProvider extends GoogleAIStudioProvider {
 
     const headers = this.buildAntigravityHeaders(credential, model, {
       streaming: streamEnabled,
+      thinkingEnabled,
     });
 
     const fetcher = createCustomFetch({

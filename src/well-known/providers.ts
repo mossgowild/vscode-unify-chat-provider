@@ -66,10 +66,8 @@ export const WELL_KNOWN_PROVIDERS: WellKnownProviderConfig[] = [
     models: wellKnowns(
       'gemini-3-pro',
       'gemini-3-flash',
-      'gemini-2.5-flash',
       'claude-sonnet-4-5',
-      'claude-sonnet-4-5-thinking',
-      'claude-opus-4-5-thinking',
+      'claude-opus-4-5',
     ),
   },
   {
