@@ -603,6 +603,11 @@ export class OllamaProvider implements ApiProvider {
       }
     }
 
+    // Check cancellation before post-loop processing
+    if (token.isCancellationRequested) {
+      return;
+    }
+
     if (snapshot) {
       if (snapshot.tool_calls) {
         for (const [index, call] of snapshot.tool_calls.entries()) {

@@ -483,6 +483,9 @@ export async function* withIdleTimeout<T>(
           return;
         }
 
+        // Final check before yielding
+        throwIfAborted(abortSignal);
+
         yield iterResult.value;
       } finally {
         if (timeoutId !== undefined) {

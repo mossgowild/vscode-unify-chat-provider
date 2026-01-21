@@ -996,6 +996,11 @@ export class AnthropicProvider implements ApiProvider {
         }
       }
     }
+
+    // Check cancellation before post-loop processing
+    if (token.isCancellationRequested) {
+      return;
+    }
   }
 
   private accumulateMessage(

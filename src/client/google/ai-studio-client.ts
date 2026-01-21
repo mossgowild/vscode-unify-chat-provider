@@ -853,6 +853,11 @@ export class GoogleAIStudioProvider implements ApiProvider {
       }
     }
 
+    // Check cancellation before post-loop processing
+    if (token.isCancellationRequested) {
+      return;
+    }
+
     if (_completeThinking) {
       yield new vscode.LanguageModelThinkingPart('', undefined, {
         _completeThinking,

@@ -743,6 +743,11 @@ export class OpenAIResponsesProvider implements ApiProvider {
       }
     }
 
+    // Check cancellation before post-loop processing
+    if (token.isCancellationRequested) {
+      return;
+    }
+
     if (usage) {
       this.processUsage(usage, performanceTrace, logger);
     }
