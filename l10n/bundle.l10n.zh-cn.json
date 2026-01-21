@@ -481,7 +481,7 @@
   "Enter Google OAuth client secret for Antigravity": "请输入用于 Antigravity 的 Google OAuth Client Secret",
   "Invalid URL": "无效的 URL",
   "Project ID (optional)": "Project ID（可选）",
-  "Optional: enter project id (leave empty to auto-detect)": "可选：输入 project id（留空将自动检测）",
+  "enter Project ID (leave empty to auto-detect)": "输入 Project ID（留空将自动检测）",
   "Paste the redirected URL from the browser address bar": "请粘贴浏览器地址栏中的重定向 URL",
   "Refresh token": "刷新令牌",
   "Refresh access token": "刷新访问令牌",

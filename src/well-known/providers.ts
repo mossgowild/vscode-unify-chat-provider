@@ -41,8 +41,8 @@ export const WELL_KNOWN_PROVIDERS: ProviderConfig[] = [
     type: 'google-antigravity',
     baseUrl: 'https://daily-cloudcode-pa.sandbox.googleapis.com',
     models: wellKnowns(
-      'gemini-3-pro-preview',
-      'gemini-3-flash-preview',
+      'gemini-3-pro',
+      'gemini-3-flash',
       'gemini-2.5-flash',
       'claude-sonnet-4-5',
       'claude-sonnet-4-5-thinking',

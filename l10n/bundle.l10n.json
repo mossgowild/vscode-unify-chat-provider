@@ -521,7 +521,7 @@
   "Google (Antigravity)": "Google (Antigravity)",
   "Google Antigravity": "Google Antigravity",
   "Invalid URL": "Invalid URL",
-  "Optional: enter project id (leave empty to auto-detect)": "Optional: enter project id (leave empty to auto-detect)",
+  "enter Project ID (leave empty to auto-detect)": "enter Project ID (leave empty to auto-detect)",
   "Paste the redirected URL from the browser address bar": "Paste the redirected URL from the browser address bar",
   "Project ID (optional)": "Project ID (optional)",
   "Refresh access token": "Refresh access token",
