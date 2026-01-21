@@ -7,10 +7,11 @@ import {
 } from './config-ops';
 import { normalizeBaseUrlInput } from './utils';
 import {
-  PROVIDER_KEYS,
-  ProviderType,
+  API_TYPE_KEYS,
+  ApiType,
 } from './client/definitions';
 import { ProviderConfig, ModelConfig } from './types';
+import { DEFAULT_PROVIDER_TYPE } from './defaults';
 
 const CONFIG_NAMESPACE = 'unifyChatProvider';
 
@@ -121,14 +122,14 @@ export class ConfigStore {
       .map((m: unknown) => this.normalizeModelConfig(m))
       .filter((m): m is ModelConfig => m !== null);
 
-    // Parse and validate type
+    // Parse and validate type (optional, defaults to openai-chat-completion)
+    let type: ApiType = DEFAULT_PROVIDER_TYPE;
     if (
-      typeof obj.type !== 'string' ||
-      !PROVIDER_KEYS.includes(obj.type as ProviderType)
+      typeof obj.type === 'string' &&
+      API_TYPE_KEYS.includes(obj.type as ApiType)
     ) {
-      return null;
+      type = obj.type as ApiType;
     }
-    const type = obj.type as ProviderType;
 
     const provider: ProviderConfig = {
       type,

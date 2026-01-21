@@ -9,7 +9,7 @@ import {
   type ProviderFormDraft,
 } from './form-utils';
 import { normalizeBaseUrlInput } from '../utils';
-import { ProviderType, PROVIDER_TYPES } from '../client/definitions';
+import { ApiType, API_TYPES } from '../client/definitions';
 import { type SecretStore } from '../secret';
 import type { EventedUriHandler } from '../uri-handler';
 import {
@@ -78,11 +78,11 @@ export const providerFormSchema: FormSchema<ProviderFormDraft> = {
       edit: async (draft) => {
         const { pickQuickItem } = await import('./component');
         const picked = await pickQuickItem<
-          vscode.QuickPickItem & { typeValue: ProviderType }
+          vscode.QuickPickItem & { typeValue: ApiType }
         >({
           title: t('API Format'),
           placeholder: t('Select the API format'),
-          items: Object.values(PROVIDER_TYPES).map((opt) => ({
+          items: Object.values(API_TYPES).map((opt) => ({
             label: opt.label,
             description: opt.description,
             picked: opt.type === draft.type,
@@ -94,7 +94,7 @@ export const providerFormSchema: FormSchema<ProviderFormDraft> = {
         }
       },
       getDescription: (draft) =>
-        Object.values(PROVIDER_TYPES).find((o) => o.type === draft.type)
+        Object.values(API_TYPES).find((o) => o.type === draft.type)
           ?.label || t('(required)'),
     },
     // Base URL field

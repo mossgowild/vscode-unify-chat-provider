@@ -41,6 +41,7 @@ import {
   mergeHeaders,
   processUsage as sharedProcessUsage,
 } from '../utils';
+import { DEFAULT_PROVIDER_TYPE } from '../../defaults';
 
 const TOOL_CALL_ID_PREFIX = 'ollama-tool:';
 
@@ -49,6 +50,11 @@ export class OllamaProvider implements ApiProvider {
 
   constructor(private readonly config: ProviderConfig) {
     this.baseUrl = buildBaseUrl(config.baseUrl, { stripPattern: /\/api$/i });
+  }
+
+  private get providerApiType(): string {
+    const providerApiType = this.config.type;
+    return providerApiType ?? DEFAULT_PROVIDER_TYPE;
   }
 
   private buildHeaders(
@@ -747,7 +753,7 @@ export class OllamaProvider implements ApiProvider {
     const logger = createSimpleHttpLogger({
       purpose: 'Get Available Models',
       providerName: this.config.name,
-      providerType: this.config.type,
+      actualApiType: this.providerApiType,
     });
     const headers = this.buildHeaders(credential);
     const client = this.createClient(headers, logger);

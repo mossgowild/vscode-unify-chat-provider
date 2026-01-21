@@ -53,6 +53,7 @@ import {
 import { getBaseModelId } from '../../model-id-utils';
 import { randomUUID } from 'crypto';
 import { ProviderConfig, ModelConfig, PerformanceTrace } from '../../types';
+import { DEFAULT_PROVIDER_TYPE } from '../../defaults';
 
 export class OpenAIResponsesProvider implements ApiProvider {
   protected readonly baseUrl: string;
@@ -62,6 +63,11 @@ export class OpenAIResponsesProvider implements ApiProvider {
       ensureSuffix: '/v1',
       skipSuffixIfMatch: /\/v\d+$/,
     });
+  }
+
+  private get providerApiType(): string {
+    const providerApiType = this.config.type;
+    return providerApiType ?? DEFAULT_PROVIDER_TYPE;
   }
 
   protected buildHeaders(
@@ -778,7 +784,7 @@ export class OpenAIResponsesProvider implements ApiProvider {
     const logger = createSimpleHttpLogger({
       purpose: 'Get Available Models',
       providerName: this.config.name,
-      providerType: this.config.type,
+      actualApiType: this.providerApiType,
     });
     try {
       const result: ModelConfig[] = [];
