@@ -580,6 +580,69 @@ type AntigravityTool = {
 export class GoogleAntigravityProvider extends GoogleAIStudioProvider {
   private activeEndpointBaseUrl: string | undefined;
 
+  /**
+   * Antigravity's Claude adapter rejects empty text fields in message parts.
+   * These can appear in streamed history (e.g., signature deltas or empty chunks),
+   * and must be removed or normalized before sending follow-up requests.
+   */
+  private sanitizeClaudeContents(contents: Content[]): void {
+    const pruneEmptyParts = (parts: Part[]): Part[] => {
+      const pruned: Part[] = [];
+
+      for (const part of parts) {
+        if (!part) {
+          continue;
+        }
+
+        const hasEmptyText = typeof part.text === 'string' && part.text === '';
+        if (!hasEmptyText) {
+          pruned.push(part);
+          continue;
+        }
+
+        const record = isRecord(part) ? part : undefined;
+        const signatureCandidate = record?.['thoughtSignature'];
+        const signature =
+          typeof signatureCandidate === 'string' && signatureCandidate.trim()
+            ? signatureCandidate
+            : (() => {
+                const alt = record?.['signature'];
+                return typeof alt === 'string' && alt.trim() ? alt : undefined;
+              })();
+
+        const hasNonTextPayload =
+          part.functionCall !== undefined ||
+          part.functionResponse !== undefined ||
+          part.inlineData !== undefined;
+
+        if (signature || hasNonTextPayload) {
+          pruned.push({ ...part, text: undefined });
+        }
+      }
+
+      return pruned;
+    };
+
+    for (const content of contents) {
+      if (!content || !Array.isArray(content.parts) || content.parts.length === 0) {
+        continue;
+      }
+
+      content.parts = pruneEmptyParts(content.parts);
+    }
+
+    for (let i = contents.length - 1; i >= 0; i--) {
+      const content = contents[i];
+      if (
+        content &&
+        Array.isArray(content.parts) &&
+        content.parts.length === 0
+      ) {
+        contents.splice(i, 1);
+      }
+    }
+  }
+
   private assertAntigravityAuth(): void {
     if (this.config.auth?.method !== 'antigravity-oauth') {
       throw new Error(
@@ -1095,6 +1158,12 @@ export class GoogleAntigravityProvider extends GoogleAIStudioProvider {
       messages,
     );
 
+    const modelIdLower = resolvedModel.requestModelId.toLowerCase();
+    const isClaudeModel = modelIdLower.includes('claude');
+    if (isClaudeModel) {
+      this.sanitizeClaudeContents(contents);
+    }
+
     const sdkTools = this.convertTools(options.tools);
     const tools = this.normalizeTools(sdkTools);
     const functionCallingConfig = this.buildAntigravityFunctionCallingConfig(
@@ -1103,7 +1172,6 @@ export class GoogleAntigravityProvider extends GoogleAIStudioProvider {
       resolvedModel.requestModelId,
     );
 
-    const modelIdLower = resolvedModel.requestModelId.toLowerCase();
     const isClaudeThinking = modelIdLower.includes('claude') && thinkingEnabled;
     if (isClaudeThinking) {
       this.normalizeClaudeThinkingToolHistory(contents);
