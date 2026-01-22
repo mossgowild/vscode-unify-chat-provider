@@ -15,7 +15,15 @@ import { GoogleAIStudioProvider } from './ai-studio-client';
 import type { RequestLogger } from '../../logger';
 import type { AuthTokenInfo } from '../../auth/types';
 import { ModelConfig, PerformanceTrace } from '../../types';
-import { DEFAULT_TIMEOUT_CONFIG, withIdleTimeout } from '../../utils';
+import {
+  DEFAULT_TIMEOUT_CONFIG,
+  isCacheControlMarker,
+  isImageMarker,
+  isInternalMarker,
+  normalizeImageMimeType,
+  withIdleTimeout,
+} from '../../utils';
+import type { ThinkingBlockMetadata } from '../types';
 import {
   createCustomFetch,
   getToken,
@@ -165,6 +173,54 @@ function sanitizeAntigravityToolName(name: string): string {
   }
 
   return sanitized;
+}
+
+const GOOGLE_TOOL_CALL_ID_PREFIX = 'google-tool:';
+
+function parseGoogleToolCallId(
+  callId: string,
+): { name: string; index: number; uuid: string } | undefined {
+  if (!callId.startsWith(GOOGLE_TOOL_CALL_ID_PREFIX)) {
+    return undefined;
+  }
+  const suffix = callId.slice(GOOGLE_TOOL_CALL_ID_PREFIX.length);
+
+  const lastColonIndex = suffix.lastIndexOf(':');
+  if (lastColonIndex === -1) {
+    return undefined;
+  }
+  const secondLastColonIndex = suffix.lastIndexOf(':', lastColonIndex - 1);
+  if (secondLastColonIndex === -1) {
+    return undefined;
+  }
+
+  const name = suffix.slice(0, secondLastColonIndex);
+  const indexStr = suffix.slice(secondLastColonIndex + 1, lastColonIndex);
+  const uuid = suffix.slice(lastColonIndex + 1);
+
+  if (!name || !uuid || !/^\d+$/.test(indexStr)) {
+    return undefined;
+  }
+
+  const index = Number.parseInt(indexStr, 10);
+  if (!Number.isSafeInteger(index) || index < 0) {
+    return undefined;
+  }
+
+  return { name, index, uuid };
+}
+
+function toBase64Url(value: Buffer): string {
+  return value
+    .toString('base64')
+    .replace(/\+/g, '-')
+    .replace(/\//g, '_')
+    .replace(/=+$/g, '');
+}
+
+function toAntigravityToolUseId(callId: string): string {
+  const digest = createHash('sha256').update(callId, 'utf8').digest();
+  return `toolu_${toBase64Url(digest)}`;
 }
 
 function sleepWithAbortSignal(
@@ -801,6 +857,262 @@ type AntigravityTool = {
 export class GoogleAntigravityProvider extends GoogleAIStudioProvider {
   private activeEndpointBaseUrl: string | undefined;
 
+  private convertClaudeMessagesForAntigravity(
+    messages: readonly vscode.LanguageModelChatRequestMessage[],
+  ): { systemInstruction?: ContentUnion; contents: Content[] } {
+    const systemParts: Part[] = [];
+    const contents: Content[] = [];
+
+    for (const msg of messages) {
+      switch (msg.role) {
+        case vscode.LanguageModelChatMessageRole.System: {
+          for (const part of msg.content) {
+            const converted = this.convertClaudePartForAntigravity(msg.role, part);
+            if (converted) {
+              systemParts.push(converted);
+            }
+          }
+          break;
+        }
+
+        case vscode.LanguageModelChatMessageRole.User: {
+          const userParts: Part[] = [];
+          const toolResultParts: Array<{ part: Part; position: number; index: number | undefined }> = [];
+
+          for (const [position, part] of msg.content.entries()) {
+            const isToolResult =
+              part instanceof vscode.LanguageModelToolResultPart ||
+              part instanceof vscode.LanguageModelToolResultPart2;
+
+            const converted = this.convertClaudePartForAntigravity(msg.role, part);
+            if (!converted) {
+              continue;
+            }
+
+            if (isToolResult) {
+              const callId = (part as vscode.LanguageModelToolResultPart2).callId;
+              const parsed = parseGoogleToolCallId(callId);
+              toolResultParts.push({ part: converted, position, index: parsed?.index });
+            } else {
+              userParts.push(converted);
+            }
+          }
+
+          const orderedToolResults = toolResultParts
+            .slice()
+            .sort((a, b) => {
+              const aIndex = a.index ?? Number.POSITIVE_INFINITY;
+              const bIndex = b.index ?? Number.POSITIVE_INFINITY;
+              if (aIndex !== bIndex) {
+                return aIndex - bIndex;
+              }
+              return a.position - b.position;
+            })
+            .map((item) => item.part);
+
+          const merged = [...userParts, ...orderedToolResults];
+          if (merged.length > 0) {
+            contents.push({ role: 'user', parts: merged });
+          }
+          break;
+        }
+
+        case vscode.LanguageModelChatMessageRole.Assistant: {
+          const modelParts: Part[] = [];
+          for (const part of msg.content) {
+            const converted = this.convertClaudePartForAntigravity(msg.role, part);
+            if (converted) {
+              modelParts.push(converted);
+            }
+          }
+          if (modelParts.length > 0) {
+            contents.push({ role: 'model', parts: modelParts });
+          }
+          break;
+        }
+
+        default:
+          throw new Error(`Unsupported message role for provider: ${msg.role}`);
+      }
+    }
+
+    const systemInstruction =
+      systemParts.length > 0
+        ? systemParts.length > 1
+          ? systemParts
+          : systemParts[0]
+        : undefined;
+
+    return {
+      systemInstruction,
+      contents,
+    };
+  }
+
+  private convertClaudePartForAntigravity(
+    role: vscode.LanguageModelChatMessageRole | 'from_tool_result',
+    part: vscode.LanguageModelInputPart | unknown,
+  ): Part | undefined {
+    if (part == null) {
+      return undefined;
+    }
+
+    if (part instanceof vscode.LanguageModelTextPart) {
+      return part.value.trim() ? { text: part.value } : undefined;
+    }
+
+    if (part instanceof vscode.LanguageModelThinkingPart) {
+      if (role !== vscode.LanguageModelChatMessageRole.Assistant) {
+        throw new Error('Thinking parts can only appear in assistant messages');
+      }
+
+      const metadata = part.metadata as ThinkingBlockMetadata | undefined;
+      const signature =
+        typeof metadata?.signature === 'string' && metadata.signature !== ''
+          ? metadata.signature
+          : undefined;
+
+      if (signature) {
+        return {
+          thought: true,
+          text:
+            typeof part.value === 'string' ? part.value : part.value.join(''),
+          thoughtSignature: signature,
+        };
+      }
+
+      const thinkingText =
+        typeof metadata?._completeThinking === 'string' &&
+        metadata._completeThinking.trim()
+          ? metadata._completeThinking
+          : typeof part.value === 'string'
+            ? part.value
+            : part.value.join('');
+
+      return thinkingText.trim()
+        ? { text: thinkingText, thought: true }
+        : undefined;
+    }
+
+    if (part instanceof vscode.LanguageModelDataPart) {
+      if (isCacheControlMarker(part) || isInternalMarker(part)) {
+        return undefined;
+      }
+
+      if (isImageMarker(part)) {
+        if (role !== vscode.LanguageModelChatMessageRole.User) {
+          throw new Error(
+            'Image parts can only appear in user messages for this provider',
+          );
+        }
+
+        const mimeType = normalizeImageMimeType(part.mimeType);
+        if (!mimeType) {
+          throw new Error(`Unsupported image mime type: ${part.mimeType}`);
+        }
+
+        return {
+          inlineData: {
+            mimeType,
+            data: Buffer.from(part.data).toString('base64'),
+          },
+        };
+      }
+
+      throw new Error(
+        `Unsupported ${role} message LanguageModelDataPart mime type: ${part.mimeType}`,
+      );
+    }
+
+    if (part instanceof vscode.LanguageModelToolCallPart) {
+      if (role !== vscode.LanguageModelChatMessageRole.Assistant) {
+        throw new Error('Tool call parts can only appear in assistant messages');
+      }
+
+      if (!isRecord(part.input)) {
+        throw new Error('Tool call input must be an object');
+      }
+
+      return {
+        functionCall: {
+          id: toAntigravityToolUseId(part.callId),
+          name: part.name,
+          args: part.input,
+        },
+      };
+    }
+
+    if (
+      part instanceof vscode.LanguageModelToolResultPart ||
+      part instanceof vscode.LanguageModelToolResultPart2
+    ) {
+      if (role !== vscode.LanguageModelChatMessageRole.User) {
+        throw new Error('Tool result parts can only appear in user messages');
+      }
+
+      const parsed = parseGoogleToolCallId(part.callId);
+      if (!parsed) {
+        throw new Error(
+          `Invalid tool callId '${part.callId}'. Expected format: ${GOOGLE_TOOL_CALL_ID_PREFIX}name:index:uuid`,
+        );
+      }
+
+      const name = parsed.name;
+      const toolUseId = toAntigravityToolUseId(part.callId);
+
+      let content: Part[] | string = part.content
+        .map((v) => this.convertClaudePartForAntigravity('from_tool_result', v))
+        .filter((v) => v !== undefined)
+        .flat();
+
+      if (content.length === 1) {
+        const value = content.at(0)!;
+        if (Object.keys(value).length === 1 && 'text' in value) {
+          content = value.text ?? '';
+        }
+      }
+
+      if (typeof content !== 'string') {
+        const output: { content: Part[]; images: { $ref: string }[] } = {
+          content: [],
+          images: [],
+        };
+        const parts: Part[] = [];
+
+        for (const [i, c] of content.entries()) {
+          if (c.inlineData) {
+            c.inlineData.displayName = `image_${i + 1}`;
+            output.images.push({ $ref: c.inlineData.displayName });
+            parts.push(c);
+          } else {
+            output.content.push(c);
+          }
+        }
+
+        if (output.images.length > 0) {
+          return {
+            functionResponse: {
+              id: toolUseId,
+              name,
+              response: { output },
+              parts,
+            },
+          };
+        }
+      }
+
+      return {
+        functionResponse: {
+          id: toolUseId,
+          name,
+          response: part.isError ? { error: content } : { output: content },
+        },
+      };
+    }
+
+    throw new Error(`Unsupported ${role} message part type encountered`);
+  }
+
   /**
    * Antigravity's Claude adapter rejects empty text fields in message parts.
    * These can appear in streamed history (e.g., signature deltas or empty chunks),
@@ -1347,10 +1659,10 @@ export class GoogleAntigravityProvider extends GoogleAIStudioProvider {
     }
   }
 
-  override async *streamChat(
-    encodedModelId: string,
-    model: ModelConfig,
-    messages: readonly vscode.LanguageModelChatRequestMessage[],
+	  override async *streamChat(
+	    encodedModelId: string,
+	    model: ModelConfig,
+	    messages: readonly vscode.LanguageModelChatRequestMessage[],
     options: vscode.ProvideLanguageModelChatResponseOptions,
     performanceTrace: PerformanceTrace,
     token: vscode.CancellationToken,
@@ -1385,24 +1697,24 @@ export class GoogleAntigravityProvider extends GoogleAIStudioProvider {
     const thinkingEnabled =
       model.thinking &&
       (model.thinking.type === 'enabled' || model.thinking.type === 'auto');
-    const resolvedModel = resolveAntigravityModelForRequest(
-      requestedModelId,
-      preferredGemini3ThinkingLevel,
-      thinkingEnabled,
-    );
+	    const resolvedModel = resolveAntigravityModelForRequest(
+	      requestedModelId,
+	      preferredGemini3ThinkingLevel,
+	      thinkingEnabled,
+	    );
 
-    const { systemInstruction, contents } = this.convertMessages(
-      encodedModelId,
-      messages,
-    );
+	    const modelIdLower = resolvedModel.requestModelId.toLowerCase();
+	    const isClaudeModel = modelIdLower.includes('claude');
 
-    normalizeSnakeCaseInPlace(contents);
+	    const { systemInstruction, contents } = isClaudeModel
+	      ? this.convertClaudeMessagesForAntigravity(messages)
+	      : this.convertMessages(encodedModelId, messages);
 
-    const modelIdLower = resolvedModel.requestModelId.toLowerCase();
-    const isClaudeModel = modelIdLower.includes('claude');
-    if (isClaudeModel) {
-      this.sanitizeClaudeContents(contents);
-    }
+	    normalizeSnakeCaseInPlace(contents);
+
+	    if (isClaudeModel) {
+	      this.sanitizeClaudeContents(contents);
+	    }
 
     const sdkTools = this.convertTools(options.tools);
     const tools = this.normalizeTools(sdkTools);
