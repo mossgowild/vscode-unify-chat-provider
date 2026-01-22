@@ -23,6 +23,7 @@
   "configuration.endpoints.type.enumDescriptions.5": "Ollama Chat API",
   "configuration.endpoints.type.enumDescriptions.6": "Google Antigravity",
   "configuration.endpoints.type.enumDescriptions.7": "OpenAI CodeX",
+  "configuration.endpoints.type.enumDescriptions.8": "Anthropic Claude Code Cloak",
   "configuration.endpoints.name.description": "此供应商的显示名称。",
   "configuration.endpoints.baseUrl.description": "API 基础 URL（例如：https://api.anthropic.com）。",
   "configuration.endpoints.extraHeaders.description": "请求中要附加的额外 Header。Header 值支持使用 `${APIKEY}` 引用该供应商的凭据。",

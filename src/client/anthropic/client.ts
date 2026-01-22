@@ -63,18 +63,26 @@ export class AnthropicProvider implements ApiProvider {
     this.baseUrl = buildBaseUrl(config.baseUrl, { stripPattern: /\/v1$/i });
   }
 
+  protected toProviderToolName(name: string): string {
+    return name;
+  }
+
+  protected fromProviderToolName(name: string): string {
+    return name;
+  }
+
   /**
    * Create an Anthropic client with custom fetch for retry support.
    * A new client is created per request to enable per-request logging.
    */
-  private createClient(
+  protected createClient(
     logger: ProviderHttpLogger | undefined,
     stream: boolean,
     credential?: AuthTokenInfo,
   ): Anthropic {
     const requestTimeoutMs = stream
-      ? this.config.timeout?.connection ?? DEFAULT_TIMEOUT_CONFIG.connection
-      : this.config.timeout?.response ?? DEFAULT_TIMEOUT_CONFIG.response;
+      ? (this.config.timeout?.connection ?? DEFAULT_TIMEOUT_CONFIG.connection)
+      : (this.config.timeout?.response ?? DEFAULT_TIMEOUT_CONFIG.response);
 
     const apiKey = getToken(credential);
 
@@ -92,9 +100,10 @@ export class AnthropicProvider implements ApiProvider {
   /**
    * Build request headers
    */
-  private buildHeaders(
+  protected buildHeaders(
     credential?: AuthTokenInfo,
     modelConfig?: ModelConfig,
+    options?: { stream?: boolean },
   ): Record<string, string | null> {
     const token = getToken(credential);
     const tokenType = getTokenType(credential);
@@ -127,7 +136,27 @@ export class AnthropicProvider implements ApiProvider {
 
     setUserAgentHeader(headers, getUnifiedUserAgent());
 
+    if (options?.stream) {
+      // Reserved for subclasses that want to key off streaming vs non-streaming requests.
+    }
+
     return headers;
+  }
+
+  protected addAdditionalBetaFeatures(_options: {
+    betaFeatures: Set<string>;
+    model: ModelConfig;
+    stream: boolean;
+    hasMemoryTool: boolean;
+    fineGrainedToolStreamingEnabled: boolean;
+    anthropicInterleavedThinkingEnabled: boolean;
+  }): void {}
+
+  protected transformRequestBase(
+    requestBase: Omit<MessageCreateParamsStreaming, 'stream'>,
+    _options: { model: ModelConfig; stream: boolean },
+  ): Omit<MessageCreateParamsStreaming, 'stream'> {
+    return requestBase;
   }
 
   /**
@@ -401,7 +430,7 @@ export class AnthropicProvider implements ApiProvider {
         {
           type: 'tool_use',
           id: part.callId,
-          name: part.name,
+          name: this.toProviderToolName(part.name),
           input: part.input,
         },
       ];
@@ -481,7 +510,7 @@ export class AnthropicProvider implements ApiProvider {
       const inputSchema = normalizeInputSchema(tool.inputSchema);
 
       result.push({
-        name: tool.name,
+        name: this.toProviderToolName(tool.name),
         description: tool.description,
         input_schema: inputSchema,
       });
@@ -687,7 +716,16 @@ export class AnthropicProvider implements ApiProvider {
       betaFeatures.add('fine-grained-tool-streaming-2025-05-14');
     }
 
-    const headers = this.buildHeaders(credential, model);
+    this.addAdditionalBetaFeatures({
+      betaFeatures,
+      model,
+      stream,
+      hasMemoryTool,
+      fineGrainedToolStreamingEnabled,
+      anthropicInterleavedThinkingEnabled,
+    });
+
+    const headers = this.buildHeaders(credential, model, { stream });
 
     // Pass thinkingEnabled to convertToolChoice to enforce tool_choice restrictions
     const toolChoice = this.applyParallelToolChoice(
@@ -696,7 +734,7 @@ export class AnthropicProvider implements ApiProvider {
     );
 
     try {
-      const requestBase: Omit<MessageCreateParamsStreaming, 'stream'> = {
+      let requestBase: Omit<MessageCreateParamsStreaming, 'stream'> = {
         model: getBaseModelId(model.id),
         messages: anthropicMessages,
         max_tokens: model.maxOutputTokens ?? DEFAULT_MAX_OUTPUT_TOKENS,
@@ -749,6 +787,8 @@ export class AnthropicProvider implements ApiProvider {
       if (betaFeatures.size > 0) {
         requestBase.betas = Array.from(betaFeatures);
       }
+
+      requestBase = this.transformRequestBase(requestBase, { model, stream });
 
       const client = this.createClient(logger, stream, credential);
 
@@ -852,7 +892,7 @@ export class AnthropicProvider implements ApiProvider {
           const input = block.input ?? {};
           yield new vscode.LanguageModelToolCallPart(
             block.id,
-            block.name,
+            this.fromProviderToolName(block.name),
             input,
           );
           break;
@@ -941,7 +981,7 @@ export class AnthropicProvider implements ApiProvider {
             case 'tool_use':
               yield new vscode.LanguageModelToolCallPart(
                 block.id,
-                block.name,
+                this.fromProviderToolName(block.name),
                 block.input as object,
               );
               break;

@@ -191,7 +191,8 @@
                   "openai-chat-completion",
                   "openai-responses",
                   "openai-codex",
-                  "ollama"
+                  "ollama",
+                  "claude-code-cloak"
                 ],
                 "enumDescriptions": [
                   "%configuration.endpoints.type.enumDescriptions.0%",
@@ -201,7 +202,8 @@
                   "%configuration.endpoints.type.enumDescriptions.3%",
                   "%configuration.endpoints.type.enumDescriptions.4%",
                   "%configuration.endpoints.type.enumDescriptions.7%",
-                  "%configuration.endpoints.type.enumDescriptions.5%"
+                  "%configuration.endpoints.type.enumDescriptions.5%",
+                  "%configuration.endpoints.type.enumDescriptions.8%"
                 ]
               },
               "name": {
