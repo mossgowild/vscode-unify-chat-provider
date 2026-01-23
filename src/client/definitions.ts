@@ -400,7 +400,13 @@ export const FEATURES: Record<FeatureId, Feature> = {
     ],
   },
   [FeatureId.OpenAIUseClearThinking]: {
-    supportedProviders: ['open.bigmodel.cn', 'api.z.ai', 'api.cerebras.ai'],
+    supportedProviders: ['open.bigmodel.cn', 'api.z.ai'],
+    customCheckers: [
+      // Checker for Cerebras GLM 4.7 model:
+      (model, provider) =>
+        matchProvider(provider.baseUrl, 'api.cerebras.ai') &&
+        matchModelFamily(getBaseModelId(model.id), ['zai-glm-4.7']),
+    ],
   },
   [FeatureId.GeminiUseThinkingLevel]: {
     supportedFamilys: ['gemini-3-'],
