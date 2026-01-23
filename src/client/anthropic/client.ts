@@ -95,8 +95,15 @@ export class AnthropicProvider implements ApiProvider {
     const token = getToken(credential);
 
     return new Anthropic({
-      ...(!this.config.auth
-        ? {}
+      ...(!this.config.auth || token == null || token === ''
+        ? {
+            // Explicitly omit auth headers for providers that don't require authentication
+            apiKey: '',
+            defaultHeaders: {
+              'X-Api-Key': null,
+              Authorization: null,
+            },
+          }
         : this.config.auth.method === 'api-key'
           ? { apiKey: token }
           : { authToken: token }),
