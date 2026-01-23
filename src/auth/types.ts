@@ -6,6 +6,7 @@ export type AuthMethod =
   | 'iflow-cli'
   | 'antigravity-oauth'
   | 'google-vertex-ai-auth'
+  | 'claude-code'
   | 'openai-codex'
   | 'qwen-code'
   | 'github-copilot';
@@ -155,6 +156,15 @@ export interface OpenAICodexAuthConfig {
   email?: string;
 }
 
+export interface ClaudeCodeAuthConfig {
+  method: 'claude-code';
+  label?: string;
+  description?: string;
+  identityId?: string;
+  token?: string;
+  email?: string;
+}
+
 export interface QwenCodeAuthConfig {
   method: 'qwen-code';
   label?: string;
@@ -246,6 +256,7 @@ export type AuthConfig =
   | IFlowCliAuthConfig
   | AntigravityOAuthConfig
   | OpenAICodexAuthConfig
+  | ClaudeCodeAuthConfig
   | QwenCodeAuthConfig
   | GitHubCopilotAuthConfig
   | GoogleVertexAIAuthConfig;

@@ -114,6 +114,13 @@ export const WELL_KNOWN_PROVIDERS: WellKnownProviderConfig[] = [
     models: ['claude-opus-4-5', 'claude-sonnet-4-5', 'claude-haiku-4-5'],
   },
   {
+    name: 'Claude Code',
+    type: 'claude-code',
+    baseUrl: 'https://api.anthropic.com',
+    authTypes: ['api-key', 'claude-code'],
+    models: ['claude-opus-4-5', 'claude-sonnet-4-5', 'claude-haiku-4-5'],
+  },
+  {
     name: 'xAI',
     type: 'openai-responses',
     baseUrl: 'https://api.x.ai',

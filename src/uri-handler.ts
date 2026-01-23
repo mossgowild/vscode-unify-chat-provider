@@ -12,7 +12,7 @@ import type { UiContext } from './ui/router/types';
 import type { ProviderConfig } from './types';
 import {
   isProviderConfigInput,
-  normalizeLegacyApiKeyProviderConfig,
+  normalizeLegacyProviderConfig,
   parseProviderConfigArray,
 } from './ui/import-config';
 import { t } from './i18n';
@@ -176,7 +176,7 @@ export class ImportConfigUriHandler implements vscode.UriHandler {
 
       // Apply overrides to each config
       const mergedConfigs = configs.map((config) =>
-        normalizeLegacyApiKeyProviderConfig(applyOverrides(config, overrides)),
+        normalizeLegacyProviderConfig(applyOverrides(config, overrides)),
       );
 
       await runUiStack(ctx, {
@@ -192,13 +192,13 @@ export class ImportConfigUriHandler implements vscode.UriHandler {
       return;
     }
 
-    const mergedConfig = normalizeLegacyApiKeyProviderConfig(
+    const normalizedConfig = normalizeLegacyProviderConfig(
       applyOverrides(configValue as Partial<ProviderConfig>, overrides),
     );
 
     await runUiStack(ctx, {
       kind: 'providerForm',
-      initialConfig: mergedConfig,
+      initialConfig: normalizedConfig,
     });
   }
 }

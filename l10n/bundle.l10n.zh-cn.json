@@ -392,7 +392,7 @@
   "API keys, OAuth tokens, and client secrets will be included in plain text": "API Key、OAuth token 与 client secret 将以明文形式包含在内",
   "API keys, OAuth tokens, and client secrets will be removed": "API Key、OAuth token 与 client secret 将被移除",
   "Anthropic Messages API": "Anthropic Messages API",
-  "Anthropic Claude Code Cloak": "Anthropic Claude Code Cloak",
+  "Anthropic Claude Code": "Anthropic Claude Code",
   "Authenticate": "进行身份验证",
   "Authenticate using OAuth 2.0": "使用 OAuth 2.0 进行身份验证",
   "Authenticate using an API key": "使用 API Key 进行身份验证",

@@ -18,7 +18,10 @@ const CLAUDE_CODE_SYSTEM_PROMPT: BetaTextBlockParam = {
 };
 
 const MCP_TOOL_PREFIX = 'mcp_';
-const NON_MCP_TOOL_NAMES: ReadonlySet<string> = new Set(['memory', 'web_search']);
+const NON_MCP_TOOL_NAMES: ReadonlySet<string> = new Set([
+  'memory',
+  'web_search',
+]);
 
 const SYSTEM_PROMPT_SANITIZERS: ReadonlyArray<[pattern: RegExp, to: string]> = [
   [/GitHub Copilot/gi, 'Claude Code'],
@@ -31,9 +34,7 @@ function escapeRegExp(value: string): string {
 function createToolNameTextRewriter(
   map: ReadonlyMap<string, string>,
 ): (text: string) => string {
-  const toolNames = Array.from(map.keys()).sort(
-    (a, b) => b.length - a.length,
-  );
+  const toolNames = Array.from(map.keys()).sort((a, b) => b.length - a.length);
   if (toolNames.length === 0) {
     return (text) => text;
   }
@@ -83,16 +84,20 @@ function toTextBlocks(
   return system;
 }
 
-export class AnthropicClaudeCodeCloakProvider extends AnthropicProvider {
+export class AnthropicClaudeCodeProvider extends AnthropicProvider {
   protected override toProviderToolName(name: string): string {
     if (NON_MCP_TOOL_NAMES.has(name)) {
       return name;
     }
-    return name.startsWith(MCP_TOOL_PREFIX) ? name : `${MCP_TOOL_PREFIX}${name}`;
+    return name.startsWith(MCP_TOOL_PREFIX)
+      ? name
+      : `${MCP_TOOL_PREFIX}${name}`;
   }
 
   protected override fromProviderToolName(name: string): string {
-    return name.startsWith(MCP_TOOL_PREFIX) ? name.slice(MCP_TOOL_PREFIX.length) : name;
+    return name.startsWith(MCP_TOOL_PREFIX)
+      ? name.slice(MCP_TOOL_PREFIX.length)
+      : name;
   }
 
   protected override buildHeaders(
@@ -142,6 +147,9 @@ export class AnthropicClaudeCodeCloakProvider extends AnthropicProvider {
     anthropicInterleavedThinkingEnabled: boolean;
   }): void {
     options.betaFeatures.add('claude-code-20250219');
+    if (this.config.auth && this.config.auth.method !== 'api-key') {
+      options.betaFeatures.add('oauth-2025-04-20');
+    }
     options.betaFeatures.add('interleaved-thinking-2025-05-14');
     options.betaFeatures.add('context-management-2025-06-27');
   }
@@ -247,7 +255,11 @@ export class AnthropicClaudeCodeCloakProvider extends AnthropicProvider {
 
     if (requestBase.tools) {
       for (const tool of requestBase.tools) {
-        if ('input_schema' in tool && 'name' in tool && typeof tool.name === 'string') {
+        if (
+          'input_schema' in tool &&
+          'name' in tool &&
+          typeof tool.name === 'string'
+        ) {
           tool.name = this.toProviderToolName(tool.name);
         }
         if ('description' in tool && typeof tool.description === 'string') {

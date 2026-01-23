@@ -2,6 +2,7 @@ import type { ModelConfig, ProviderConfig } from '../types';
 import { MODEL_CONFIG_KEYS, mergePartialFromRecordByKeys } from '../config-ops';
 import { mergePartialProviderConfig } from './base64-config';
 import { createProviderDraft, type ProviderFormDraft } from './form-utils';
+import { getRenamedProviderType } from '../secret/migration';
 
 /**
  * Import compatibility: migrate legacy top-level `apiKey` field to `auth`.
@@ -24,6 +25,34 @@ export function normalizeLegacyApiKeyProviderConfig(
 
   delete next.apiKey;
   return next;
+}
+
+/**
+ * Import compatibility: rename legacy provider types.
+ */
+export function normalizeLegacyProviderTypeProviderConfig(
+  config: Partial<ProviderConfig>,
+): Partial<ProviderConfig> {
+  const record = config as unknown as Record<string, unknown>;
+  const rawType = record['type'];
+  if (typeof rawType !== 'string') {
+    return config;
+  }
+
+  const renamed = getRenamedProviderType(rawType);
+  if (!renamed) {
+    return config;
+  }
+
+  return { ...config, type: renamed };
+}
+
+export function normalizeLegacyProviderConfig(
+  config: Partial<ProviderConfig>,
+): Partial<ProviderConfig> {
+  return normalizeLegacyApiKeyProviderConfig(
+    normalizeLegacyProviderTypeProviderConfig(config),
+  );
 }
 
 function isObjectRecord(value: unknown): value is Record<string, unknown> {
@@ -88,6 +117,6 @@ export function buildProviderDraftFromConfig(
   config: Partial<ProviderConfig>,
 ): ProviderFormDraft {
   const draft = createProviderDraft();
-  mergePartialProviderConfig(draft, normalizeLegacyApiKeyProviderConfig(config));
+  mergePartialProviderConfig(draft, normalizeLegacyProviderConfig(config));
   return draft;
 }

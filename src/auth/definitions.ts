@@ -6,6 +6,7 @@ import { IFlowCliAuthProvider } from './providers/iflow-cli';
 import { AntigravityOAuthProvider } from './providers/antigravity-oauth';
 import { GitHubCopilotAuthProvider } from './providers/github-copilot';
 import { GoogleVertexAIAuthProvider } from './providers/google-vertex-ai-auth';
+import { ClaudeCodeAuthProvider } from './providers/claude-code';
 import { OpenAICodexAuthProvider } from './providers/openai-codex';
 import { QwenCodeAuthProvider } from './providers/qwen-code';
 import { OAuth2AuthProvider } from './providers/oauth2';
@@ -73,6 +74,12 @@ export const AUTH_METHODS = {
     label: t('OpenAI CodeX'),
     description: t('Authenticate using OpenAI CodeX OAuth (ChatGPT Plus/Pro)'),
     ctor: OpenAICodexAuthProvider,
+  },
+  'claude-code': {
+    id: 'claude-code',
+    label: t('Claude Code'),
+    description: t('Authenticate using Claude Code OAuth'),
+    ctor: ClaudeCodeAuthProvider,
   },
   'qwen-code': {
     id: 'qwen-code',

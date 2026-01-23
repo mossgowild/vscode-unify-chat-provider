@@ -3,6 +3,7 @@ import { ConfigStore } from './config-store';
 import {
   SecretStore,
   migrateApiKeyToAuth,
+  migrateProviderTypes,
   migrateApiKeyStorage,
   cleanupUnusedSecrets,
 } from './secret';
@@ -46,6 +47,7 @@ export async function activate(
   const authManager = new AuthManager(configStore, secretStore, uriHandler);
   context.subscriptions.push(authManager);
 
+  await migrateProviderTypes(configStore);
   await migrateApiKeyToAuth(configStore);
 
   const chatProvider = new UnifyChatService(configStore, secretStore, authManager);

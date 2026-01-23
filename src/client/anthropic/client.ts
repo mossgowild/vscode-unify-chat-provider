@@ -47,7 +47,6 @@ import {
   parseToolArguments,
   processUsage as sharedProcessUsage,
   getToken,
-  getTokenType,
   getUnifiedUserAgent,
   setUserAgentHeader,
 } from '../utils';
@@ -61,7 +60,7 @@ import type { AuthTokenInfo } from '../../auth/types';
 export class AnthropicProvider implements ApiProvider {
   private readonly baseUrl: string;
 
-  constructor(private readonly config: ProviderConfig) {
+  constructor(protected readonly config: ProviderConfig) {
     this.baseUrl = buildBaseUrl(config.baseUrl, { stripPattern: /\/v1$/i });
   }
 
@@ -93,10 +92,14 @@ export class AnthropicProvider implements ApiProvider {
       ? (this.config.timeout?.connection ?? fallbackTimeout.connection)
       : (this.config.timeout?.response ?? fallbackTimeout.response);
 
-    const apiKey = getToken(credential);
+    const token = getToken(credential);
 
     return new Anthropic({
-      apiKey,
+      ...(!this.config.auth
+        ? {}
+        : this.config.auth.method === 'api-key'
+          ? { apiKey: token }
+          : { authToken: token }),
       baseURL: this.baseUrl,
       maxRetries: 0,
       fetch: createCustomFetch({
@@ -117,33 +120,12 @@ export class AnthropicProvider implements ApiProvider {
     options?: { stream?: boolean },
   ): Record<string, string | null> {
     const token = getToken(credential);
-    const tokenType = getTokenType(credential);
 
     const headers: Record<string, string | null> = mergeHeaders(
       token,
       this.config.extraHeaders,
       modelConfig?.extraHeaders,
     );
-
-    if (token) {
-      headers['x-api-key'] = token;
-      if (tokenType) {
-        headers['Authorization'] = `${tokenType} ${token}`;
-      }
-    } else {
-      const hasAuthHeader = Object.keys(headers).some((key) => {
-        const normalized = key.toLowerCase();
-        if (normalized === 'authorization' || normalized === 'x-api-key') {
-          const value = headers[key];
-          return value != null && value !== '';
-        }
-        return false;
-      });
-      if (!hasAuthHeader) {
-        // Explicitly omit auth headers to satisfy Anthropic SDK validation.
-        headers['x-api-key'] = null;
-      }
-    }
 
     setUserAgentHeader(headers, getUnifiedUserAgent());
 

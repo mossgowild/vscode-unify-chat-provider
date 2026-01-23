@@ -195,7 +195,7 @@
                   "openai-responses",
                   "openai-codex",
                   "ollama",
-                  "claude-code-cloak"
+                  "claude-code"
                 ],
                 "enumDescriptions": [
                   "%configuration.endpoints.type.enumDescriptions.0%",

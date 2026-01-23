@@ -8,6 +8,30 @@ import { isSecretRef } from './constants';
 import { t } from '../i18n';
 import { getAuthMethodCtor } from '../auth';
 
+const LEGACY_PROVIDER_TYPE_RENAMES = {
+  'claude-code-cloak': 'claude-code',
+} as const;
+
+type LegacyProviderType = keyof typeof LEGACY_PROVIDER_TYPE_RENAMES;
+type RenamedProviderType =
+  (typeof LEGACY_PROVIDER_TYPE_RENAMES)[LegacyProviderType];
+
+function isLegacyProviderType(value: string): value is LegacyProviderType {
+  return Object.prototype.hasOwnProperty.call(LEGACY_PROVIDER_TYPE_RENAMES, value);
+}
+
+export function getRenamedProviderType(
+  value: string,
+): RenamedProviderType | undefined {
+  return isLegacyProviderType(value) ? LEGACY_PROVIDER_TYPE_RENAMES[value] : undefined;
+}
+
+export function renameLegacyProviderType(
+  value: string,
+): RenamedProviderType | string {
+  return getRenamedProviderType(value) ?? value;
+}
+
 function getApiKeyFromAuth(auth: AuthConfig | undefined): string | undefined {
   if (!auth || typeof auth !== 'object' || Array.isArray(auth)) {
     return undefined;
@@ -76,6 +100,40 @@ export async function migrateApiKeyToAuth(
     }
 
     return next;
+  });
+
+  if (didChange) {
+    await configStore.setRawEndpoints(updated);
+  }
+}
+
+export async function migrateProviderTypes(
+  configStore: ConfigStore,
+): Promise<void> {
+  const rawEndpoints = configStore.rawEndpoints;
+  if (!Array.isArray(rawEndpoints) || rawEndpoints.length === 0) {
+    return;
+  }
+
+  let didChange = false;
+  const updated = rawEndpoints.map((item): unknown => {
+    if (!item || typeof item !== 'object' || Array.isArray(item)) {
+      return item;
+    }
+
+    const obj = item as Record<string, unknown>;
+    const typeValue = obj['type'];
+    if (typeof typeValue !== 'string') {
+      return item;
+    }
+
+    const renamed = renameLegacyProviderType(typeValue);
+    if (renamed === typeValue) {
+      return item;
+    }
+
+    didChange = true;
+    return { ...obj, type: renamed };
   });
 
   if (didChange) {

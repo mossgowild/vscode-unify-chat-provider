@@ -392,7 +392,7 @@
   "API keys, OAuth tokens, and client secrets will be included in plain text": "API keys, OAuth tokens, and client secrets will be included in plain text",
   "API keys, OAuth tokens, and client secrets will be removed": "API keys, OAuth tokens, and client secrets will be removed",
   "Anthropic Messages API": "Anthropic Messages API",
-  "Anthropic Claude Code Cloak": "Anthropic Claude Code Cloak",
+  "Anthropic Claude Code": "Anthropic Claude Code",
   "Authenticate": "Authenticate",
   "Authenticate using OAuth 2.0": "Authenticate using OAuth 2.0",
   "Authenticate using an API key": "Authenticate using an API key",

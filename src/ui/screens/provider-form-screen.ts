@@ -4,7 +4,7 @@ import { confirmDelete, pickQuickItem, showDeletedMessage } from '../component';
 import { mergePartialProviderConfig } from '../base64-config';
 import { editField } from '../field-editors';
 import { buildFormItems, type FormItem } from '../field-schema';
-import { normalizeLegacyApiKeyProviderConfig } from '../import-config';
+import { normalizeLegacyProviderConfig } from '../import-config';
 import {
   confirmDiscardProviderChanges,
   createProviderDraft,
@@ -305,7 +305,7 @@ async function ensureInitialized(
   if (route.initialConfig && !existing) {
     mergePartialProviderConfig(
       draft,
-      normalizeLegacyApiKeyProviderConfig(route.initialConfig),
+      normalizeLegacyProviderConfig(route.initialConfig),
     );
   }
 

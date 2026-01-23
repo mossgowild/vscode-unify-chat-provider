@@ -23,6 +23,7 @@ export { cleanupUnusedSecrets } from './cleanup';
 // Migration
 export {
   migrateApiKeyToAuth,
+  migrateProviderTypes,
   migrateApiKeyStorage,
   deleteApiKeySecretIfUnused,
 } from './migration';

@@ -1,7 +1,7 @@
 import { getBaseModelId } from '../model-id-utils';
 import { t } from '../i18n';
 import { AnthropicProvider } from './anthropic/client';
-import { AnthropicClaudeCodeCloakProvider } from './anthropic/claude-code-cloak-client';
+import { AnthropicClaudeCodeProvider } from './anthropic/claude-code-client';
 import { GoogleAIStudioProvider } from './google/ai-studio-client';
 import { GoogleAntigravityProvider } from './google/antigravity-client';
 import { GoogleGeminiCLIProvider } from './google/gemini-cli-client';
@@ -18,7 +18,7 @@ import { matchProvider, matchModelFamily } from './utils';
 
 export type ProviderType =
   | 'anthropic'
-  | 'claude-code-cloak'
+  | 'claude-code'
   | 'google-ai-studio'
   | 'google-vertex-ai'
   | 'google-antigravity'
@@ -37,11 +37,11 @@ export const PROVIDER_TYPES: Record<ProviderType, ProviderDefinition> = {
     description: '/v1/messages',
     class: AnthropicProvider,
   },
-  'claude-code-cloak': {
-    type: 'claude-code-cloak',
-    label: t('Anthropic Claude Code Cloak'),
+  'claude-code': {
+    type: 'claude-code',
+    label: t('Anthropic Claude Code'),
     description: '/v1/messages',
-    class: AnthropicClaudeCodeCloakProvider,
+    class: AnthropicClaudeCodeProvider,
   },
   'google-ai-studio': {
     type: 'google-ai-studio',

@@ -24,7 +24,7 @@
   "configuration.endpoints.type.enumDescriptions.6": "Google Antigravity",
   "configuration.endpoints.type.enumDescriptions.7": "OpenAI CodeX",
   "configuration.endpoints.type.enumDescriptions.8": "Google Gemini CLI",
-  "configuration.endpoints.type.enumDescriptions.9": "Anthropic Claude Code Cloak",
+  "configuration.endpoints.type.enumDescriptions.9": "Anthropic Claude Code",
   "configuration.endpoints.type.enumDescriptions.10": "GitHub Copilot",
   "configuration.endpoints.type.enumDescriptions.11": "Qwen Code",
   "configuration.endpoints.name.description": "Display name for this provider.",
