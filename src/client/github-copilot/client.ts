@@ -169,7 +169,11 @@ function applyCopilotHeaders(options: {
 
   for (const key of Object.keys(headers)) {
     const lower = key.toLowerCase();
-    if (lower === 'x-api-key' || lower === 'authorization' || lower === 'user-agent') {
+    if (
+      lower === 'x-api-key' ||
+      lower === 'authorization' ||
+      lower === 'user-agent'
+    ) {
       delete headers[key];
     }
   }
@@ -224,11 +228,17 @@ class GitHubCopilotResponsesProvider extends OpenAIResponsesProvider {
   }
 
   protected override buildHeaders(
+    sessionId: string,
     credential?: AuthTokenInfo,
     modelConfig?: ModelConfig,
     messages?: readonly LanguageModelChatRequestMessage[],
   ): Record<string, string> {
-    const headers = super.buildHeaders(credential, modelConfig, messages);
+    const headers = super.buildHeaders(
+      sessionId,
+      credential,
+      modelConfig,
+      messages,
+    );
     applyCopilotHeaders({ headers, credential, messages });
     return headers;
   }

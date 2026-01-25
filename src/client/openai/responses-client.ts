@@ -71,6 +71,7 @@ export class OpenAIResponsesProvider implements ApiProvider {
   }
 
   protected buildHeaders(
+    sessionId: string,
     credential?: AuthTokenInfo,
     modelConfig?: ModelConfig,
     _messages?: readonly LanguageModelChatRequestMessage[],
@@ -127,10 +128,15 @@ export class OpenAIResponsesProvider implements ApiProvider {
     });
   }
 
+  protected generateSessionId(): string {
+    return randomUUID();
+  }
+
   private convertMessages(
     encodedModelId: string,
     messages: readonly vscode.LanguageModelChatRequestMessage[],
-  ): ResponseInput {
+  ): { input: ResponseInput; sessionId: string } {
+    let firstSessionId: string | null = null;
     const outItems: ResponseInputItem[] = [];
     const rawMap = new Map<ResponseInputItem, ResponseInputItem[]>();
 
@@ -162,10 +168,14 @@ export class OpenAIResponsesProvider implements ApiProvider {
             ) as vscode.LanguageModelDataPart | undefined;
             if (rawPart) {
               try {
-                const raw = decodeStatefulMarkerPart<ResponseInputItem[]>(
-                  encodedModelId,
-                  rawPart,
-                );
+                const { data: raw, sessionId } =
+                  decodeStatefulMarkerPart<OpenAIResponsesMarkerData>(
+                    encodedModelId,
+                    rawPart,
+                  );
+                if (firstSessionId == null && sessionId) {
+                  firstSessionId = sessionId;
+                }
                 const item: EasyInputMessage = {
                   role: 'assistant',
                   content: '',
@@ -199,7 +209,10 @@ export class OpenAIResponsesProvider implements ApiProvider {
       outItems.splice(index, 1, ...raw);
     }
 
-    return outItems;
+    return {
+      input: outItems,
+      sessionId: firstSessionId ?? this.generateSessionId(),
+    };
   }
 
   convertPart(
@@ -419,6 +432,11 @@ export class OpenAIResponsesProvider implements ApiProvider {
     }
   }
 
+  protected handleRequest(
+    sessionId: string,
+    baseBody: ResponseCreateParamsBase,
+  ) {}
+
   async *streamChat(
     encodedModelId: string,
     model: ModelConfig,
@@ -439,7 +457,10 @@ export class OpenAIResponsesProvider implements ApiProvider {
       return;
     }
 
-    const convertedMessages = this.convertMessages(encodedModelId, messages);
+    const { input: convertedMessages, sessionId } = this.convertMessages(
+      encodedModelId,
+      messages,
+    );
     const tools = this.convertTools(options.tools);
     const toolChoice = this.convertToolChoice(options.toolMode, tools);
     const streamEnabled = model.stream ?? true;
@@ -477,9 +498,11 @@ export class OpenAIResponsesProvider implements ApiProvider {
         : { include: ['reasoning.encrypted_content'] }),
     };
 
+    this.handleRequest(sessionId, baseBody);
+
     Object.assign(baseBody, this.config.extraBody, model.extraBody);
 
-    const headers = this.buildHeaders(credential, model, messages);
+    const headers = this.buildHeaders(sessionId, credential, model, messages);
 
     const client = this.createClient(
       logger,
@@ -509,6 +532,7 @@ export class OpenAIResponsesProvider implements ApiProvider {
         );
         yield* this.parseMessageStream(
           timedStream,
+          sessionId,
           token,
           logger,
           performanceTrace,
@@ -521,7 +545,7 @@ export class OpenAIResponsesProvider implements ApiProvider {
             signal: abortController.signal,
           },
         );
-        yield* this.parseMessage(data, performanceTrace, logger);
+        yield* this.parseMessage(data, sessionId, performanceTrace, logger);
       }
     } finally {
       cancellationListener.dispose();
@@ -530,6 +554,7 @@ export class OpenAIResponsesProvider implements ApiProvider {
 
   private async *parseMessage(
     message: OpenAIResponse,
+    sessionId: string,
     performanceTrace: PerformanceTrace,
     logger: RequestLogger,
   ): AsyncGenerator<vscode.LanguageModelResponsePart2> {
@@ -588,7 +613,10 @@ export class OpenAIResponsesProvider implements ApiProvider {
       }
     }
 
-    yield encodeStatefulMarkerPart<ResponseInputItem[]>(message.output);
+    yield encodeStatefulMarkerPart<OpenAIResponsesMarkerData>({
+      data: message.output,
+      sessionId,
+    });
 
     if (message.usage) {
       this.processUsage(message.usage, performanceTrace, logger);
@@ -667,6 +695,7 @@ export class OpenAIResponsesProvider implements ApiProvider {
 
   private async *parseMessageStream(
     stream: AsyncIterable<ResponseStreamEvent>,
+    sessionId: string,
     token: vscode.CancellationToken,
     logger: RequestLogger,
     performanceTrace: PerformanceTrace,
@@ -736,7 +765,10 @@ export class OpenAIResponsesProvider implements ApiProvider {
             'metadata-only',
           );
 
-          yield encodeStatefulMarkerPart<ResponseInputItem[]>(response.output);
+          yield encodeStatefulMarkerPart<OpenAIResponsesMarkerData>({
+            data: response.output,
+            sessionId,
+          });
           break;
         }
 
@@ -811,7 +843,7 @@ export class OpenAIResponsesProvider implements ApiProvider {
         'normal',
       );
       const page = await client.models.list({
-        headers: this.buildHeaders(credential),
+        headers: this.buildHeaders(this.generateSessionId(), credential),
       });
       for await (const model of page) {
         result.push({ id: model.id });
@@ -823,3 +855,8 @@ export class OpenAIResponsesProvider implements ApiProvider {
     }
   }
 }
+
+export type OpenAIResponsesMarkerData = {
+  data: ResponseInputItem[];
+  sessionId?: string;
+};

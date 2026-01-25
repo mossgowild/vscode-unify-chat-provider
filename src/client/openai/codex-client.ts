@@ -13,6 +13,7 @@ import { createCustomFetch, getToken } from '../utils';
 import { OpenAIResponsesProvider } from './responses-client';
 import { randomBytes } from 'crypto';
 import { OPENCODE_CODEX_INSTRUCTIONS } from './codex-instructions';
+import type { ResponseCreateParamsBase } from 'openai/resources/responses/responses';
 
 const CODEX_API_ENDPOINT = 'https://chatgpt.com/backend-api/codex/responses';
 const CODEX_ORIGINATOR = 'opencode';
@@ -77,8 +78,6 @@ function sanitizeCodexHeaders(headersInit: HeadersInit | undefined): Headers {
 }
 
 export class OpenAICodeXProvider extends OpenAIResponsesProvider {
-  private readonly sessionId = createOpencodeSessionId();
-
   private assertCodexAuth(): void {
     if (this.config.auth?.method !== 'openai-codex') {
       throw new Error(
@@ -88,15 +87,16 @@ export class OpenAICodeXProvider extends OpenAIResponsesProvider {
   }
 
   protected override buildHeaders(
+    sessionId: string,
     credential?: AuthTokenInfo,
     modelConfig?: ModelConfig,
   ): Record<string, string> {
-    const headers = super.buildHeaders(credential, modelConfig);
+    const headers = super.buildHeaders(sessionId, credential, modelConfig);
 
     headers['Accept'] = '*/*';
     headers['User-Agent'] = buildOpencodeUserAgent();
     headers['originator'] = CODEX_ORIGINATOR;
-    headers['session_id'] = this.sessionId;
+    headers['session_id'] = sessionId;
 
     const auth = this.config.auth;
     if (auth?.method === 'openai-codex') {
@@ -107,6 +107,21 @@ export class OpenAICodeXProvider extends OpenAIResponsesProvider {
     }
 
     return headers;
+  }
+
+  protected generateSessionId(): string {
+    return createOpencodeSessionId();
+  }
+
+  protected override handleRequest(
+    sessionId: string,
+    baseBody: ResponseCreateParamsBase,
+  ): void {
+    Object.assign(baseBody, {
+      store: false,
+      prompt_cache_key: sessionId,
+      instructions: OPENCODE_CODEX_INSTRUCTIONS,
+    });
   }
 
   protected override createClient(
@@ -199,17 +214,6 @@ export class OpenAICodeXProvider extends OpenAIResponsesProvider {
     const systemAsUserText =
       systemTextParts.length > 0 ? systemTextParts.join('\n\n') : undefined;
 
-    const codexModel: ModelConfig = {
-      ...model,
-      maxOutputTokens: undefined,
-      extraBody: {
-        ...(model.extraBody ?? {}),
-        store: false,
-        prompt_cache_key: this.sessionId,
-        instructions: OPENCODE_CODEX_INSTRUCTIONS,
-      },
-    };
-
     const codexMessages: vscode.LanguageModelChatRequestMessage[] = messages
       .filter(
         (message) =>
@@ -227,7 +231,7 @@ export class OpenAICodeXProvider extends OpenAIResponsesProvider {
 
     yield* super.streamChat(
       encodedModelId,
-      codexModel,
+      model,
       codexMessages,
       options,
       performanceTrace,
