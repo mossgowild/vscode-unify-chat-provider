@@ -154,7 +154,13 @@ export class AnthropicProvider implements ApiProvider {
 
   protected transformRequestBase(
     requestBase: Omit<MessageCreateParamsStreaming, 'stream'>,
-    _options: { model: ModelConfig; stream: boolean },
+    _options: {
+      model: ModelConfig;
+      stream: boolean;
+      credential?: AuthTokenInfo;
+      historyUserId?: string;
+      requestState: { userId?: string };
+    },
   ): Omit<MessageCreateParamsStreaming, 'stream'> {
     return requestBase;
   }
@@ -168,10 +174,12 @@ export class AnthropicProvider implements ApiProvider {
   ): {
     system?: string | BetaTextBlockParam[];
     messages: BetaMessageParam[];
+    historyUserId?: string;
   } {
     let system: BetaTextBlockParam[] = [];
     const outMessages: BetaMessageParam[] = [];
     const rawMap = new Map<BetaMessageParam, BetaMessage>();
+    let firstHistoryUserId: string | undefined;
 
     for (const msg of messages) {
       switch (msg.role) {
@@ -197,9 +205,14 @@ export class AnthropicProvider implements ApiProvider {
           ) as vscode.LanguageModelDataPart | undefined;
           if (rawPart) {
             try {
-              const raw = rawPart
-                ? decodeStatefulMarkerPart<BetaMessage>(encodedModelId, rawPart)
-                : undefined;
+              const decoded = decodeStatefulMarkerPart<{
+                raw: BetaMessage;
+                userId?: string;
+              }>(encodedModelId, rawPart);
+              const raw = decoded.raw;
+              if (firstHistoryUserId == null && decoded.userId) {
+                firstHistoryUserId = decoded.userId;
+              }
               if (raw) {
                 const message: BetaMessageParam = {
                   role: 'assistant',
@@ -235,6 +248,7 @@ export class AnthropicProvider implements ApiProvider {
     return {
       messages: this.ensureAlternatingRoles(outMessages),
       system: system.length > 0 ? system : undefined,
+      historyUserId: firstHistoryUserId,
     };
   }
 
@@ -674,10 +688,11 @@ export class AnthropicProvider implements ApiProvider {
         model,
       );
 
-    const { system, messages: anthropicMessages } = this.convertMessages(
-      encodedModelId,
-      messages,
-    );
+    const {
+      system,
+      messages: anthropicMessages,
+      historyUserId,
+    } = this.convertMessages(encodedModelId, messages);
 
     // Convert tools with model config for web search and memory tool support
     // Also add tools if web search is enabled even without explicit tools
@@ -788,7 +803,14 @@ export class AnthropicProvider implements ApiProvider {
         requestBase.betas = Array.from(betaFeatures);
       }
 
-      requestBase = this.transformRequestBase(requestBase, { model, stream });
+      const requestState: { userId?: string } = {};
+      requestBase = this.transformRequestBase(requestBase, {
+        model,
+        stream,
+        credential,
+        historyUserId,
+        requestState,
+      });
 
       const client = this.createClient(
         logger,
@@ -826,6 +848,7 @@ export class AnthropicProvider implements ApiProvider {
           logger,
           performanceTrace,
           fineGrainedToolStreamingEnabled,
+          requestState,
         );
       } else {
         const result = await client.beta.messages.create(
@@ -838,7 +861,12 @@ export class AnthropicProvider implements ApiProvider {
             signal: abortController.signal,
           },
         );
-        yield* this.parseMessage(result, performanceTrace, logger);
+        yield* this.parseMessage(
+          result,
+          performanceTrace,
+          logger,
+          requestState,
+        );
       }
     } finally {
       cancellationListener.dispose();
@@ -849,6 +877,7 @@ export class AnthropicProvider implements ApiProvider {
     message: Anthropic.Beta.Messages.BetaMessage,
     performanceTrace: PerformanceTrace,
     logger: RequestLogger,
+    state: { userId?: string },
   ): AsyncGenerator<vscode.LanguageModelResponsePart2> {
     // NOTE: The current behavior of VSCode is such that all Parts returned here will be
     // aggregated into a single Part during the next request, and only the Thinking part
@@ -906,7 +935,10 @@ export class AnthropicProvider implements ApiProvider {
           throw new Error(`Unsupported message block type: ${block.type}`);
       }
     }
-    yield encodeStatefulMarkerPart<BetaMessage>(raw);
+    yield encodeStatefulMarkerPart<{ raw: BetaMessage; userId?: string }>({
+      raw,
+      userId: state.userId,
+    });
 
     if (message.usage) {
       this.processUsage(message.usage, performanceTrace, logger);
@@ -919,6 +951,7 @@ export class AnthropicProvider implements ApiProvider {
     logger: RequestLogger,
     performanceTrace: PerformanceTrace,
     fineGrainedToolStreamingEnabled: boolean,
+    state: { userId?: string },
   ): AsyncGenerator<vscode.LanguageModelResponsePart2> {
     let raw: BetaMessage | undefined;
 
@@ -1016,7 +1049,12 @@ export class AnthropicProvider implements ApiProvider {
         }
 
         case 'message_stop': {
-          yield encodeStatefulMarkerPart<BetaMessage>(raw);
+          yield encodeStatefulMarkerPart<{ raw: BetaMessage; userId?: string }>(
+            {
+              raw,
+              userId: state.userId,
+            },
+          );
 
           if (raw.usage) {
             this.processUsage(raw.usage, performanceTrace, logger);

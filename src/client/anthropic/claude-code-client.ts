@@ -1,4 +1,5 @@
 import type { AuthTokenInfo } from '../../auth/types';
+import type { AuthConfig } from '../../auth/types';
 import type { ModelConfig } from '../../types';
 import type {
   BetaContentBlockParam,
@@ -6,7 +7,7 @@ import type {
   BetaTextBlockParam,
   MessageCreateParamsStreaming,
 } from '@anthropic-ai/sdk/resources/beta/messages';
-import { randomBytes, randomUUID } from 'node:crypto';
+import { createHash, randomBytes, randomUUID } from 'node:crypto';
 import { AnthropicProvider } from './client';
 
 const DEFAULT_CLAUDE_CODE_CLI_VERSION = '2.1.5';
@@ -59,8 +60,36 @@ function sanitizeSystemPromptText(text: string): string {
   return sanitized;
 }
 
-function generateFakeUserId(): string {
-  const hexPart = randomBytes(32).toString('hex');
+function pickStableAuthIdentifier(auth: AuthConfig | undefined): string | null {
+  if (!auth || auth.method === 'none') {
+    return null;
+  }
+  if (
+    'identityId' in auth &&
+    typeof auth.identityId === 'string' &&
+    auth.identityId.trim() !== ''
+  ) {
+    return auth.identityId.trim();
+  }
+  if ('email' in auth && typeof auth.email === 'string' && auth.email.trim()) {
+    return auth.email.trim();
+  }
+  if (
+    auth.method === 'api-key' &&
+    'apiKey' in auth &&
+    typeof auth.apiKey === 'string' &&
+    auth.apiKey.trim()
+  ) {
+    return auth.apiKey.trim();
+  }
+  return null;
+}
+
+function generateFakeUserId(options?: { seed?: string | null }): string {
+  const seed = options?.seed?.trim();
+  const hexPart = seed
+    ? createHash('sha256').update(seed, 'utf8').digest('hex')
+    : randomBytes(32).toString('hex');
   const uuid = randomUUID();
   return `user_${hexPart}_account__session_${uuid}`;
 }
@@ -156,14 +185,20 @@ export class AnthropicClaudeCodeProvider extends AnthropicProvider {
 
   protected override transformRequestBase(
     requestBase: Omit<MessageCreateParamsStreaming, 'stream'>,
-    _options: { model: ModelConfig; stream: boolean },
+    options: {
+      model: ModelConfig;
+      stream: boolean;
+      credential?: AuthTokenInfo;
+      historyUserId?: string;
+      requestState: { userId?: string };
+    },
   ): Omit<MessageCreateParamsStreaming, 'stream'> {
     const strictMode = false;
     const normalizeParams = true;
 
     // Match Claude-Cloak's behavior:
     // - System prompt injection (strict vs non-strict)
-    // - Ensure metadata.user_id matches Claude Code format
+    // - Ensure metadata.user_id is stable across turns (Claude Code format)
     // - Strip top_p (only when NORMALIZE_PARAMS=true)
     const systemBlocks = toTextBlocks(requestBase.system);
     const mergedSystem = strictMode
@@ -176,13 +211,14 @@ export class AnthropicClaudeCodeProvider extends AnthropicProvider {
     }
     requestBase.system = mergedSystem;
 
-    const existingUserId = requestBase.metadata?.user_id;
-    if (!existingUserId || !isValidUserId(existingUserId)) {
-      requestBase.metadata = {
-        ...(requestBase.metadata ?? {}),
-        user_id: generateFakeUserId(),
-      };
-    }
+    const userId =
+      options.historyUserId && isValidUserId(options.historyUserId)
+        ? options.historyUserId
+        : generateFakeUserId({
+            seed: pickStableAuthIdentifier(this.config.auth),
+          });
+    options.requestState.userId = userId;
+    requestBase.metadata = { user_id: userId };
 
     if (normalizeParams && 'top_p' in requestBase) {
       delete requestBase.top_p;
