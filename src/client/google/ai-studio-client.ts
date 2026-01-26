@@ -329,13 +329,22 @@ export class GoogleAIStudioProvider implements ApiProvider {
     };
   }
 
-  private generateToolCallId(name: string, index: number): string {
-    return `${TOOL_CALL_ID_PREFIX}${name}:${index}:${randomUUID()}`;
+  private generateToolCallId(
+    name: string,
+    id: string | undefined,
+    index: number,
+  ): string {
+    return `${TOOL_CALL_ID_PREFIX}${name}:${index}:${id ? 'id' : 'uuid'}:${id ? id : randomUUID()}`;
   }
 
-  private parseToolCallId(
-    callId: string,
-  ): { name: string; index: number; uuid: string } | undefined {
+  private parseToolCallId(callId: string):
+    | {
+        name: string;
+        index: number;
+        uuid: string | undefined;
+        id: string | undefined;
+      }
+    | undefined {
     if (!callId.startsWith(TOOL_CALL_ID_PREFIX)) {
       return undefined;
     }
@@ -349,12 +358,28 @@ export class GoogleAIStudioProvider implements ApiProvider {
     if (secondLastColonIndex === -1) {
       return undefined;
     }
+    const thirdLastColonIndex = suffix.lastIndexOf(
+      ':',
+      secondLastColonIndex - 1,
+    );
+    if (thirdLastColonIndex === -1) {
+      return undefined;
+    }
 
-    const name = suffix.slice(0, secondLastColonIndex);
-    const indexStr = suffix.slice(secondLastColonIndex + 1, lastColonIndex);
-    const uuid = suffix.slice(lastColonIndex + 1);
+    const name = suffix.slice(0, thirdLastColonIndex);
+    const indexStr = suffix.slice(
+      thirdLastColonIndex + 1,
+      secondLastColonIndex,
+    );
+    const type = suffix.slice(secondLastColonIndex + 1, lastColonIndex);
+    const idOrUuid = suffix.slice(lastColonIndex + 1);
 
-    if (!name || !uuid || !/^\d+$/.test(indexStr)) {
+    if (
+      !name ||
+      !/^\d+$/.test(indexStr) ||
+      (type !== 'uuid' && type !== 'id') ||
+      !idOrUuid
+    ) {
       return undefined;
     }
 
@@ -363,7 +388,12 @@ export class GoogleAIStudioProvider implements ApiProvider {
       return undefined;
     }
 
-    return { name, index, uuid };
+    return {
+      name,
+      index,
+      uuid: type === 'uuid' ? idOrUuid : undefined,
+      id: type === 'id' ? idOrUuid : undefined,
+    };
   }
 
   /**
@@ -429,9 +459,7 @@ export class GoogleAIStudioProvider implements ApiProvider {
         if (part.functionResponse?.id) {
           const parsed = this.parseToolCallId(part.functionResponse.id);
           if (parsed) {
-            // Clear the generated ID - let API use its own ID matching
-            // The name field is already set correctly
-            part.functionResponse.id = undefined;
+            part.functionResponse.id = parsed.id;
           }
         }
       }
@@ -787,8 +815,9 @@ export class GoogleAIStudioProvider implements ApiProvider {
         }
       } else if (part.functionCall) {
         const name = part.functionCall.name!;
+        const id = part.functionCall.id;
         const args = part.functionCall.args ?? {};
-        const callId = this.generateToolCallId(name, toolCallIndex++);
+        const callId = this.generateToolCallId(name, id, toolCallIndex++);
         yield new vscode.LanguageModelToolCallPart(callId, name, args);
         // Preserve original API response in state parts
         stateParts.push(part);
@@ -854,8 +883,9 @@ export class GoogleAIStudioProvider implements ApiProvider {
 
           if (part.functionCall) {
             const name = part.functionCall.name!;
+            const id = part.functionCall.id;
             const args = part.functionCall.args ?? {};
-            const callId = this.generateToolCallId(name, toolCallIndex++);
+            const callId = this.generateToolCallId(name, id, toolCallIndex++);
             yield new vscode.LanguageModelToolCallPart(callId, name, args);
           }
         }
@@ -917,12 +947,7 @@ export class GoogleAIStudioProvider implements ApiProvider {
       providerType: this.config.type,
     });
     try {
-    const client = this.createClient(
-      undefined,
-      false,
-      credential,
-      'normal',
-    );
+      const client = this.createClient(undefined, false, credential, 'normal');
       const result: ModelConfig[] = [];
       const pager = await withGoogleFetchLogger(logger, async () => {
         return client.models.list({

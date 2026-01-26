@@ -18,17 +18,11 @@ import { ModelConfig, PerformanceTrace } from '../../types';
 import {
   DEFAULT_CHAT_RETRY_CONFIG,
   DEFAULT_CHAT_TIMEOUT_CONFIG,
-  decodeStatefulMarkerPart,
   isAbortError,
-  isCacheControlMarker,
-  isImageMarker,
-  isInternalMarker,
   isRetryableStatusCode,
-  normalizeImageMimeType,
   withIdleTimeout,
   type RetryConfig,
 } from '../../utils';
-import type { ThinkingBlockMetadata } from '../types';
 import {
   createCustomFetch,
   getToken,
@@ -142,7 +136,9 @@ function abortSignalToError(signal: AbortSignal): Error {
   if (reason instanceof Error) {
     return reason;
   }
-  return new Error(reason === undefined ? 'The operation was aborted.' : String(reason));
+  return new Error(
+    reason === undefined ? 'The operation was aborted.' : String(reason),
+  );
 }
 
 function throwIfAborted(signal: AbortSignal | undefined): void {
@@ -307,10 +303,17 @@ function buildSignatureSessionId(options: {
     .toLowerCase()
     .replace(/-(minimal|low|medium|high)$/i, '');
 
-  const projectKey = options.projectId.trim() ? options.projectId.trim() : 'default';
+  const projectKey = options.projectId.trim()
+    ? options.projectId.trim()
+    : 'default';
 
-  const seed = extractConversationSeed(options.systemInstruction, options.contents);
-  const conversationKey = seed ? `seed-${hashConversationSeed(seed)}` : 'default';
+  const seed = extractConversationSeed(
+    options.systemInstruction,
+    options.contents,
+  );
+  const conversationKey = seed
+    ? `seed-${hashConversationSeed(seed)}`
+    : 'default';
 
   return `${PLUGIN_SESSION_ID}:${modelForKey}:${projectKey}:${conversationKey}`;
 }
@@ -372,54 +375,6 @@ function buildToolParameterSignature(schema: unknown): string {
   }
 
   return segments.join(', ');
-}
-
-const GOOGLE_TOOL_CALL_ID_PREFIX = 'google-tool:';
-
-function parseGoogleToolCallId(
-  callId: string,
-): { name: string; index: number; uuid: string } | undefined {
-  if (!callId.startsWith(GOOGLE_TOOL_CALL_ID_PREFIX)) {
-    return undefined;
-  }
-  const suffix = callId.slice(GOOGLE_TOOL_CALL_ID_PREFIX.length);
-
-  const lastColonIndex = suffix.lastIndexOf(':');
-  if (lastColonIndex === -1) {
-    return undefined;
-  }
-  const secondLastColonIndex = suffix.lastIndexOf(':', lastColonIndex - 1);
-  if (secondLastColonIndex === -1) {
-    return undefined;
-  }
-
-  const name = suffix.slice(0, secondLastColonIndex);
-  const indexStr = suffix.slice(secondLastColonIndex + 1, lastColonIndex);
-  const uuid = suffix.slice(lastColonIndex + 1);
-
-  if (!name || !uuid || !/^\d+$/.test(indexStr)) {
-    return undefined;
-  }
-
-  const index = Number.parseInt(indexStr, 10);
-  if (!Number.isSafeInteger(index) || index < 0) {
-    return undefined;
-  }
-
-  return { name, index, uuid };
-}
-
-function toBase64Url(value: Buffer): string {
-  return value
-    .toString('base64')
-    .replace(/\+/g, '-')
-    .replace(/\//g, '_')
-    .replace(/=+$/g, '');
-}
-
-function toAntigravityToolUseId(callId: string): string {
-  const digest = createHash('sha256').update(callId, 'utf8').digest();
-  return `toolu_${toBase64Url(digest)}`;
 }
 
 function cleanJsonSchemaForAntigravity(schema: unknown): unknown {
@@ -1022,11 +977,6 @@ type AntigravityTool = {
   functionDeclarations: AntigravityFunctionDeclaration[];
 };
 
-type AntigravityRedactedThinkingPart = Part & {
-  type: 'redacted_thinking';
-  data: string;
-};
-
 export type CodeAssistHeaderDefaults = {
   'User-Agent': string;
   'X-Goog-Api-Client': string;
@@ -1057,467 +1007,94 @@ export abstract class GoogleCodeAssistProvider extends GoogleAIStudioProvider {
 
   private activeEndpointBaseUrl: string | undefined;
 
-  private convertClaudeMessagesForAntigravity(
-    encodedModelId: string,
-    messages: readonly vscode.LanguageModelChatRequestMessage[],
-  ): {
-    systemInstruction?: ContentUnion;
-    contents: Content[];
-    disableThinkingConfig: boolean;
-  } {
-    const systemParts: Part[] = [];
-    const contents: Content[] = [];
-    const toolUseIdByCallId = new Map<string, string>();
-    let disableThinkingConfig = false;
-
-    for (const msg of messages) {
-      switch (msg.role) {
-        case vscode.LanguageModelChatMessageRole.System: {
-          for (const part of msg.content) {
-            const converted = this.convertClaudePartForAntigravity(
-              msg.role,
-              part,
-              toolUseIdByCallId,
-            );
-            if (converted) {
-              systemParts.push(converted);
-            }
-          }
-          break;
-        }
-
-        case vscode.LanguageModelChatMessageRole.User: {
-          const userParts: Part[] = [];
-          const toolResultParts: Array<{
-            part: Part;
-            position: number;
-            index: number | undefined;
-          }> = [];
-
-          for (const [position, part] of msg.content.entries()) {
-            const isToolResult =
-              part instanceof vscode.LanguageModelToolResultPart ||
-              part instanceof vscode.LanguageModelToolResultPart2;
-
-            const converted = this.convertClaudePartForAntigravity(
-              msg.role,
-              part,
-              toolUseIdByCallId,
-            );
-            if (!converted) {
-              if (part instanceof vscode.LanguageModelThinkingPart) {
-                const metadata = part.metadata as
-                  | ThinkingBlockMetadata
-                  | undefined;
-                const signature =
-                  typeof metadata?.signature === 'string' &&
-                  metadata.signature.trim()
-                    ? metadata.signature
-                    : undefined;
-                if (!signature) {
-                  disableThinkingConfig = true;
-                }
-              }
-              continue;
-            }
-
-            if (isToolResult) {
-              const parsed = parseGoogleToolCallId(part.callId);
-              toolResultParts.push({
-                part: converted,
-                position,
-                index: parsed?.index,
-              });
-            } else {
-              userParts.push(converted);
-            }
-          }
-
-          const orderedToolResults = toolResultParts
-            .slice()
-            .sort((a, b) => {
-              const aIndex = a.index ?? Number.POSITIVE_INFINITY;
-              const bIndex = b.index ?? Number.POSITIVE_INFINITY;
-              if (aIndex !== bIndex) {
-                return aIndex - bIndex;
-              }
-              return a.position - b.position;
-            })
-            .map((item) => item.part);
-
-          const merged = [...userParts, ...orderedToolResults];
-          if (merged.length > 0) {
-            contents.push({ role: 'user', parts: merged });
-          }
-          break;
-        }
-
-        case vscode.LanguageModelChatMessageRole.Assistant: {
-          const rawPart = msg.content.find(
-            (v): v is vscode.LanguageModelDataPart =>
-              v instanceof vscode.LanguageModelDataPart && isInternalMarker(v),
-          );
-
-          if (rawPart) {
-            try {
-              const raw = decodeStatefulMarkerPart<Content[]>(
-                encodedModelId,
-                rawPart,
-              );
-
-              const mergedParts: Part[] = [];
-              for (const content of raw) {
-                if (!content || !Array.isArray(content.parts)) {
-                  continue;
-                }
-                mergedParts.push(...content.parts);
-              }
-
-              const toolCallParts = msg.content.filter(
-                (v): v is vscode.LanguageModelToolCallPart =>
-                  v instanceof vscode.LanguageModelToolCallPart,
-              );
-
-              const functionCallParts = mergedParts.filter(
-                (
-                  p,
-                ): p is Part & {
-                  functionCall: NonNullable<Part['functionCall']>;
-                } => p.functionCall !== undefined,
-              );
-
-              for (const toolCallPart of toolCallParts) {
-                const parsed = parseGoogleToolCallId(toolCallPart.callId);
-                if (!parsed) {
-                  continue;
-                }
-
-                const toolUseId =
-                  toolUseIdByCallId.get(toolCallPart.callId) ??
-                  toAntigravityToolUseId(toolCallPart.callId);
-                toolUseIdByCallId.set(toolCallPart.callId, toolUseId);
-
-                const functionCallPart = functionCallParts[parsed.index];
-                if (!functionCallPart) {
-                  continue;
-                }
-
-                functionCallPart.functionCall.id = toolUseId;
-              }
-
-              if (mergedParts.length > 0) {
-                contents.push({ role: 'model', parts: mergedParts });
-              }
-              break;
-            } catch {}
-          }
-
-          const modelParts: Part[] = [];
-          for (const part of msg.content) {
-            const converted = this.convertClaudePartForAntigravity(
-              msg.role,
-              part,
-              toolUseIdByCallId,
-            );
-            if (converted) {
-              modelParts.push(converted);
-            } else if (part instanceof vscode.LanguageModelThinkingPart) {
-              const metadata = part.metadata as
-                | ThinkingBlockMetadata
-                | undefined;
-              const signature =
-                typeof metadata?.signature === 'string' &&
-                metadata.signature.trim()
-                  ? metadata.signature
-                  : undefined;
-              if (!signature) {
-                disableThinkingConfig = true;
-              }
-            }
-          }
-          if (modelParts.length > 0) {
-            contents.push({ role: 'model', parts: modelParts });
-          }
-          break;
-        }
-
-        default:
-          throw new Error(`Unsupported message role for provider: ${msg.role}`);
-      }
-    }
-
-    const systemInstruction =
-      systemParts.length > 0
-        ? systemParts.length > 1
-          ? systemParts
-          : systemParts[0]
-        : undefined;
-
-    return {
-      systemInstruction,
-      contents,
-      disableThinkingConfig,
-    };
-  }
-
-  private convertClaudePartForAntigravity(
-    role: vscode.LanguageModelChatMessageRole | 'from_tool_result',
-    part: vscode.LanguageModelInputPart | unknown,
-    toolUseIdByCallId: Map<string, string>,
-  ): Part | undefined {
-    if (part == null) {
-      return undefined;
-    }
-
-    if (part instanceof vscode.LanguageModelTextPart) {
-      return part.value.trim() ? { text: part.value } : undefined;
-    }
-
-    if (part instanceof vscode.LanguageModelThinkingPart) {
-      if (role !== vscode.LanguageModelChatMessageRole.Assistant) {
-        throw new Error('Thinking parts can only appear in assistant messages');
-      }
-
-      const metadata = part.metadata as ThinkingBlockMetadata | undefined;
-      const redactedData =
-        typeof metadata?.redactedData === 'string' &&
-        metadata.redactedData.trim()
-          ? metadata.redactedData
-          : undefined;
-      if (redactedData) {
-        const redactedPart: AntigravityRedactedThinkingPart = {
-          type: 'redacted_thinking',
-          data: redactedData,
-        };
-        return redactedPart;
-      }
-
-      const signature =
-        typeof metadata?.signature === 'string' && metadata.signature !== ''
-          ? metadata.signature
-          : undefined;
-
-      if (!signature) {
-        // Antigravity's Claude adapter requires a thinking signature; when we don't
-        // have one (common for streamed VS Code thinking parts), omit the block.
-        return undefined;
-      }
-
-      const thinkingText =
-        typeof metadata?._completeThinking === 'string' &&
-        metadata._completeThinking.trim()
-          ? metadata._completeThinking
-          : typeof part.value === 'string'
-            ? part.value
-            : part.value.join('');
-
-      return thinkingText.trim()
-        ? {
-            text: thinkingText,
-            thought: true,
-            thoughtSignature: signature,
-          }
-        : undefined;
-    }
-
-    if (part instanceof vscode.LanguageModelDataPart) {
-      if (isCacheControlMarker(part) || isInternalMarker(part)) {
-        return undefined;
-      }
-
-      if (isImageMarker(part)) {
-        if (role !== vscode.LanguageModelChatMessageRole.User) {
-          throw new Error(
-            'Image parts can only appear in user messages for this provider',
-          );
-        }
-
-        const mimeType = normalizeImageMimeType(part.mimeType);
-        if (!mimeType) {
-          throw new Error(`Unsupported image mime type: ${part.mimeType}`);
-        }
-
-        return {
-          inlineData: {
-            mimeType,
-            data: Buffer.from(part.data).toString('base64'),
-          },
-        };
-      }
-
-      throw new Error(
-        `Unsupported ${role} message LanguageModelDataPart mime type: ${part.mimeType}`,
-      );
-    }
-
-    if (part instanceof vscode.LanguageModelToolCallPart) {
-      if (role !== vscode.LanguageModelChatMessageRole.Assistant) {
-        throw new Error(
-          'Tool call parts can only appear in assistant messages',
-        );
-      }
-
-      if (!isRecord(part.input)) {
-        throw new Error('Tool call input must be an object');
-      }
-
-      const toolUseId =
-        toolUseIdByCallId.get(part.callId) ??
-        toAntigravityToolUseId(part.callId);
-      toolUseIdByCallId.set(part.callId, toolUseId);
-
-      return {
-        functionCall: {
-          id: toolUseId,
-          name: part.name,
-          args: part.input,
-        },
-      };
-    }
-
-    if (
-      part instanceof vscode.LanguageModelToolResultPart ||
-      part instanceof vscode.LanguageModelToolResultPart2
-    ) {
-      if (role !== vscode.LanguageModelChatMessageRole.User) {
-        throw new Error('Tool result parts can only appear in user messages');
-      }
-
-      const parsed = parseGoogleToolCallId(part.callId);
-      if (!parsed) {
-        throw new Error(
-          `Invalid tool callId '${part.callId}'. Expected format: ${GOOGLE_TOOL_CALL_ID_PREFIX}name:index:uuid`,
-        );
-      }
-
-      const name = parsed.name;
-      const toolUseId =
-        toolUseIdByCallId.get(part.callId) ??
-        toAntigravityToolUseId(part.callId);
-      toolUseIdByCallId.set(part.callId, toolUseId);
-
-      let content: Part[] | string = part.content
-        .map((v) =>
-          this.convertClaudePartForAntigravity(
-            'from_tool_result',
-            v,
-            toolUseIdByCallId,
-          ),
-        )
-        .filter((v) => v !== undefined)
-        .flat();
-
-      if (content.length === 1) {
-        const value = content.at(0)!;
-        if (Object.keys(value).length === 1 && 'text' in value) {
-          content = value.text ?? '';
-        }
-      }
-
-      if (typeof content !== 'string') {
-        const output: { content: Part[]; images: { $ref: string }[] } = {
-          content: [],
-          images: [],
-        };
-        const parts: Part[] = [];
-
-        for (const [i, c] of content.entries()) {
-          if (c.inlineData) {
-            c.inlineData.displayName = `image_${i + 1}`;
-            output.images.push({ $ref: c.inlineData.displayName });
-            parts.push(c);
-          } else {
-            output.content.push(c);
-          }
-        }
-
-        if (output.images.length > 0) {
-          return {
-            functionResponse: {
-              id: toolUseId,
-              name,
-              response: { output },
-              parts,
-            },
-          };
-        }
-      }
-
-      return {
-        functionResponse: {
-          id: toolUseId,
-          name,
-          response: part.isError ? { error: content } : { output: content },
-        },
-      };
-    }
-
-    throw new Error(`Unsupported ${role} message part type encountered`);
-  }
-
   /**
-   * Antigravity's Claude adapter rejects empty text fields in message parts.
-   * These can appear in streamed history (e.g., signature deltas or empty chunks),
-   * and must be removed or normalized before sending follow-up requests.
+   * The Claude adapter for Antigravity rejects empty text fields in the message parts.
+   * These fields may appear in the streamed history (for example, in signature
+   * changes or as empty chunks of data) and must be removed or normalized
+   * before sending any follow-up requests.
+   *
+   * The process involves merging the same role contents, merging the text parts
+   * of each piece of content, removing any parts with empty text,
+   * and then sorting the parts – with the thought parts always coming first.
    */
   private sanitizeClaudeContents(contents: Content[]): void {
-    const pruneEmptyParts = (parts: Part[]): Part[] => {
-      const pruned: Part[] = [];
-
-      for (const part of parts) {
-        if (!part) {
-          continue;
-        }
-
-        const hasEmptyText = typeof part.text === 'string' && part.text === '';
-        if (!hasEmptyText) {
-          pruned.push(part);
-          continue;
-        }
-
-        const record = isRecord(part) ? part : undefined;
-        const signatureCandidate = record?.['thoughtSignature'];
-        const signature =
-          typeof signatureCandidate === 'string' && signatureCandidate.trim()
-            ? signatureCandidate
-            : (() => {
-                const alt = record?.['signature'];
-                return typeof alt === 'string' && alt.trim() ? alt : undefined;
-              })();
-
-        const hasNonTextPayload =
-          part.functionCall !== undefined ||
-          part.functionResponse !== undefined ||
-          part.inlineData !== undefined;
-
-        if (signature || hasNonTextPayload) {
-          pruned.push({ ...part, text: undefined });
-        }
-      }
-
-      return pruned;
-    };
-
+    // Merge same role contents
+    const newContents: Content[] = [];
+    let lastContent: Content | undefined = undefined;
     for (const content of contents) {
-      if (
-        !content ||
-        !Array.isArray(content.parts) ||
-        content.parts.length === 0
-      ) {
-        continue;
+      if (lastContent && lastContent.role === content.role) {
+        if (lastContent.parts && content.parts) {
+          lastContent.parts.push(...content.parts);
+        } else if (content.parts) {
+          lastContent.parts = content.parts;
+        }
+      } else {
+        newContents.push(content);
+        lastContent = content;
       }
+    }
+    contents.length = 0;
+    contents.push(...newContents);
 
-      content.parts = pruneEmptyParts(content.parts);
+    // Merge text parts into a single part and sort parts
+    for (const content of contents) {
+      if (content.parts && content.role !== 'user') {
+        let mergedThinkingText = '';
+        let mergedThinkingSignature: string | undefined = undefined;
+        let mergedText = '';
+        const otherParts: Part[] = [];
+        for (const part of content.parts) {
+          if (part.thought) {
+            if (part.thoughtSignature) {
+              mergedThinkingSignature = part.thoughtSignature;
+            }
+            if (part.text) {
+              mergedThinkingText += part.text;
+            }
+          } else if (typeof part.text === 'string') {
+            mergedText += part.text;
+          } else {
+            otherParts.push(part);
+          }
+        }
+        content.parts = [
+          ...(mergedThinkingText
+            ? [
+                {
+                  text: mergedThinkingText,
+                  thought: true,
+                  thoughtSignature: mergedThinkingSignature,
+                } satisfies Part,
+              ]
+            : []),
+          ...(mergedText ? [{ text: mergedText } satisfies Part] : []),
+          ...otherParts,
+        ];
+      }
     }
 
-    for (let i = contents.length - 1; i >= 0; i--) {
+    // Remove empty text parts
+    let i = contents.length;
+    while (i--) {
       const content = contents[i];
-      if (
-        content &&
-        Array.isArray(content.parts) &&
-        content.parts.length === 0
-      ) {
-        contents.splice(i, 1);
+      if (content.parts) {
+        content.parts = content.parts.filter((part) => {
+          if (part.text) return true;
+          let hasNonText = false;
+          for (const key in part) {
+            if (key === 'text' || key === 'thought') {
+              continue;
+            }
+            if (part[key as keyof Part] !== undefined) {
+              hasNonText = true;
+              break;
+            }
+          }
+          return hasNonText;
+        });
+        if (content.parts.length === 0) {
+          contents.splice(i, 1);
+        }
       }
     }
   }
@@ -1657,7 +1234,8 @@ export abstract class GoogleCodeAssistProvider extends GoogleAIStudioProvider {
       !Object.keys(headers).some((k) => k.toLowerCase() === 'client-metadata')
     ) {
       headers['Client-Metadata'] =
-        randomized['Client-Metadata'] ?? this.codeAssistHeaders['Client-Metadata'];
+        randomized['Client-Metadata'] ??
+        this.codeAssistHeaders['Client-Metadata'];
     }
 
     // Fingerprint headers override randomized headers and add quota/device IDs.
@@ -1797,209 +1375,6 @@ export abstract class GoogleCodeAssistProvider extends GoogleAIStudioProvider {
     return { role: 'user', parts };
   }
 
-  private isClaudeThinkingPart(part: Part): boolean {
-    const record = isRecord(part) ? part : undefined;
-    if (!record) {
-      return false;
-    }
-
-    if (record['thought'] === true) {
-      return true;
-    }
-
-    const typeValue = record['type'];
-    if (
-      typeValue === 'thinking' ||
-      typeValue === 'redacted_thinking' ||
-      typeValue === 'reasoning'
-    ) {
-      return true;
-    }
-
-    return typeof record['thinking'] === 'string';
-  }
-
-  /**
-   * Claude thinking models on Antigravity are sensitive to thinking block ordering.
-   * Ensure that thinking parts (if present) always come before tool calls/text.
-   */
-  private normalizeClaudeThinkingToolHistory(contents: Content[]): void {
-    for (const content of contents) {
-      if (
-        !content ||
-        content.role !== 'model' ||
-        !Array.isArray(content.parts)
-      ) {
-        continue;
-      }
-
-      const parts = content.parts;
-      if (parts.length === 0) {
-        continue;
-      }
-
-      const thinkingParts: Part[] = [];
-      const otherParts: Part[] = [];
-
-      for (const part of parts) {
-        if (this.isClaudeThinkingPart(part)) {
-          thinkingParts.push(part);
-        } else {
-          otherParts.push(part);
-        }
-      }
-
-      if (thinkingParts.length === 0) {
-        continue;
-      }
-
-      const firstIsThinking = this.isClaudeThinkingPart(parts[0]);
-      if (!firstIsThinking) {
-        content.parts = [...thinkingParts, ...otherParts];
-      }
-    }
-  }
-
-  private getClaudeThoughtSignature(part: Part): string | undefined {
-    const record = isRecord(part) ? part : undefined;
-    if (!record) {
-      return undefined;
-    }
-
-    const candidates: unknown[] = [
-      record['thoughtSignature'],
-      record['thought_signature'],
-      record['signature'],
-    ];
-
-    for (const value of candidates) {
-      if (typeof value === 'string' && value.trim()) {
-        return value.trim();
-      }
-    }
-
-    return undefined;
-  }
-
-  private normalizeClaudeThinkingSignatures(contents: Content[]): void {
-    for (const content of contents) {
-      if (
-        !content ||
-        content.role !== 'model' ||
-        !Array.isArray(content.parts) ||
-        content.parts.length === 0
-      ) {
-        continue;
-      }
-
-      const thinkingParts: Part[] = [];
-      const otherParts: Part[] = [];
-
-      for (const part of content.parts) {
-        if (!this.isClaudeThinkingPart(part)) {
-          otherParts.push(part);
-          continue;
-        }
-
-        const record = isRecord(part) ? part : undefined;
-        const typeValue = record?.['type'];
-        if (typeValue === 'redacted_thinking') {
-          thinkingParts.push(part);
-          continue;
-        }
-
-        const signature = this.getClaudeThoughtSignature(part);
-        if (!signature) {
-          continue;
-        }
-
-        if (record) {
-          record['thoughtSignature'] = signature;
-        }
-        thinkingParts.push(part);
-      }
-
-      content.parts =
-        thinkingParts.length > 0
-          ? [...thinkingParts, ...otherParts]
-          : otherParts;
-    }
-  }
-
-  private ensureClaudeToolCallThoughtSignatures(contents: Content[]): void {
-    const skipSentinel = 'skip_thought_signature_validator';
-
-    for (const content of contents) {
-      if (
-        !content ||
-        content.role !== 'model' ||
-        !Array.isArray(content.parts) ||
-        content.parts.length === 0
-      ) {
-        continue;
-      }
-
-      let signature: string | undefined;
-      for (const part of content.parts) {
-        if (!this.isClaudeThinkingPart(part)) {
-          continue;
-        }
-
-        const candidate = this.getClaudeThoughtSignature(part);
-        if (candidate) {
-          signature = candidate;
-          break;
-        }
-      }
-
-      for (const part of content.parts) {
-        if (!part.functionCall) {
-          continue;
-        }
-
-        const record = isRecord(part) ? part : undefined;
-        if (!record) {
-          continue;
-        }
-
-        const existing = this.getClaudeThoughtSignature(part);
-        if (existing) {
-          continue;
-        }
-
-        record['thoughtSignature'] = signature ?? skipSentinel;
-      }
-    }
-  }
-
-  private hasClaudeToolCallWithoutLeadingThinking(
-    contents: Content[],
-  ): boolean {
-    for (const content of contents) {
-      if (
-        !content ||
-        content.role !== 'model' ||
-        !Array.isArray(content.parts) ||
-        content.parts.length === 0
-      ) {
-        continue;
-      }
-
-      const hasToolCall = content.parts.some(
-        (part) => part.functionCall !== undefined,
-      );
-      if (!hasToolCall) {
-        continue;
-      }
-
-      if (!this.isClaudeThinkingPart(content.parts[0])) {
-        return true;
-      }
-    }
-
-    return false;
-  }
-
   private normalizeTools(
     tools: Tool[] | undefined,
     options?: { hardenClaudeTools: boolean },
@@ -2032,7 +1407,10 @@ export abstract class GoogleCodeAssistProvider extends GoogleAIStudioProvider {
         if (options?.hardenClaudeTools) {
           const signature = buildToolParameterSignature(parameters);
           if (signature) {
-            description += CLAUDE_DESCRIPTION_PROMPT.replace('{params}', signature);
+            description += CLAUDE_DESCRIPTION_PROMPT.replace(
+              '{params}',
+              signature,
+            );
           }
         }
 
@@ -2195,7 +1573,8 @@ export abstract class GoogleCodeAssistProvider extends GoogleAIStudioProvider {
 
     const streamEnabled = model.stream ?? true;
     const requestTimeoutMs = streamEnabled
-      ? (this.config.timeout?.connection ?? DEFAULT_CHAT_TIMEOUT_CONFIG.connection)
+      ? (this.config.timeout?.connection ??
+        DEFAULT_CHAT_TIMEOUT_CONFIG.connection)
       : (this.config.timeout?.response ?? DEFAULT_CHAT_TIMEOUT_CONFIG.response);
 
     const requestedModelId = getBaseModelId(model.id);
@@ -2218,21 +1597,27 @@ export abstract class GoogleCodeAssistProvider extends GoogleAIStudioProvider {
     const modelIdLower = resolvedModel.requestModelId.toLowerCase();
     const isClaudeModel = modelIdLower.includes('claude');
 
-    const convertedMessages = isClaudeModel
-      ? this.convertClaudeMessagesForAntigravity(encodedModelId, messages)
-      : {
-          ...this.convertMessages(encodedModelId, messages),
-          disableThinkingConfig: false,
-        };
+    const convertedMessages = this.convertMessages(encodedModelId, messages);
 
     const { systemInstruction, contents } = convertedMessages;
-    let disableThinkingConfig = convertedMessages.disableThinkingConfig;
 
     normalizeSnakeCaseInPlace(contents);
 
     if (isClaudeModel) {
       this.sanitizeClaudeContents(contents);
     }
+
+    const hasFinalPositionThinking =
+      contents
+        .filter((v) => v.role === 'model')
+        .at(-1)
+        ?.parts?.find((v) => v.thought) ?? false;
+    const disableThinkingConfig = isClaudeModel
+      ? !hasFinalPositionThinking
+      : false;
+    const claudeThinkingRequested =
+      isClaudeModel && (thinkingEnabled || modelIdLower.includes('thinking'));
+    const isClaudeThinking = claudeThinkingRequested && !disableThinkingConfig;
 
     const sdkTools = this.convertTools(options.tools);
     const tools = this.normalizeTools(sdkTools, {
@@ -2243,21 +1628,6 @@ export abstract class GoogleCodeAssistProvider extends GoogleAIStudioProvider {
       tools,
       resolvedModel.requestModelId,
     );
-
-    const claudeThinkingRequested =
-      isClaudeModel && (thinkingEnabled || modelIdLower.includes('thinking'));
-
-    if (claudeThinkingRequested) {
-      this.normalizeClaudeThinkingToolHistory(contents);
-      this.normalizeClaudeThinkingSignatures(contents);
-      this.ensureClaudeToolCallThoughtSignatures(contents);
-
-      if (this.hasClaudeToolCallWithoutLeadingThinking(contents)) {
-        disableThinkingConfig = true;
-      }
-    }
-
-    const isClaudeThinking = claudeThinkingRequested && !disableThinkingConfig;
 
     const injectSystemInstruction =
       this.shouldInjectAntigravitySystemInstruction(
@@ -2397,17 +1767,20 @@ export abstract class GoogleCodeAssistProvider extends GoogleAIStudioProvider {
         init: RequestInit,
       ): Promise<Response> => {
         const maxRetries =
-          effectiveRetryConfig.maxRetries ?? DEFAULT_CHAT_RETRY_CONFIG.maxRetries;
+          effectiveRetryConfig.maxRetries ??
+          DEFAULT_CHAT_RETRY_CONFIG.maxRetries;
         const initialDelayMs =
           effectiveRetryConfig.initialDelayMs ??
           DEFAULT_CHAT_RETRY_CONFIG.initialDelayMs;
         const maxDelayMs =
-          effectiveRetryConfig.maxDelayMs ?? DEFAULT_CHAT_RETRY_CONFIG.maxDelayMs;
+          effectiveRetryConfig.maxDelayMs ??
+          DEFAULT_CHAT_RETRY_CONFIG.maxDelayMs;
         const backoffMultiplier =
           effectiveRetryConfig.backoffMultiplier ??
           DEFAULT_CHAT_RETRY_CONFIG.backoffMultiplier;
         const jitterFactor =
-          effectiveRetryConfig.jitterFactor ?? DEFAULT_CHAT_RETRY_CONFIG.jitterFactor;
+          effectiveRetryConfig.jitterFactor ??
+          DEFAULT_CHAT_RETRY_CONFIG.jitterFactor;
 
         let lastResponse: Response | undefined;
         let lastError: Error | undefined;
@@ -2440,7 +1813,8 @@ export abstract class GoogleCodeAssistProvider extends GoogleAIStudioProvider {
 
               const MAX_SERVER_RETRY_DELAY_MS = 30 * 60 * 1000;
               const cappedServerDelayMs =
-                typeof serverDelayMs === 'number' && Number.isFinite(serverDelayMs)
+                typeof serverDelayMs === 'number' &&
+                Number.isFinite(serverDelayMs)
                   ? Math.min(serverDelayMs, MAX_SERVER_RETRY_DELAY_MS)
                   : null;
 
@@ -2466,7 +1840,8 @@ export abstract class GoogleCodeAssistProvider extends GoogleAIStudioProvider {
               throw error;
             }
 
-            lastError = error instanceof Error ? error : new Error(String(error));
+            lastError =
+              error instanceof Error ? error : new Error(String(error));
 
             const delayMs = calculateBackoffDelay(attempt, {
               initialDelayMs,
@@ -2553,8 +1928,8 @@ export abstract class GoogleCodeAssistProvider extends GoogleAIStudioProvider {
       this.activeEndpointBaseUrl = responseEndpointBase;
 
       if (streamEnabled) {
-          const responseTimeoutMs =
-            this.config.timeout?.response ?? DEFAULT_CHAT_TIMEOUT_CONFIG.response;
+        const responseTimeoutMs =
+          this.config.timeout?.response ?? DEFAULT_CHAT_TIMEOUT_CONFIG.response;
 
         const stream = this.streamAntigravitySse(
           response,
