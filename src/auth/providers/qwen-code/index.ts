@@ -348,6 +348,10 @@ function toPersistableConfig(
 }
 
 export class QwenCodeAuthProvider implements AuthProvider {
+  static supportsSensitiveDataInSettings(_auth: QwenCodeAuthConfig): boolean {
+    return false;
+  }
+
   static redactForExport(auth: QwenCodeAuthConfig): QwenCodeAuthConfig {
     return { ...toPersistableConfig(auth), token: undefined };
   }
@@ -899,4 +903,3 @@ export class QwenCodeAuthProvider implements AuthProvider {
     this._onDidChangeStatus.dispose();
   }
 }
-

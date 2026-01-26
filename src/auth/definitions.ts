@@ -21,6 +21,14 @@ export type AuthMethodDefinition = {
 };
 
 export type AuthProviderStatics<TAuth extends AuthConfig> = {
+  /**
+   * Whether this auth method supports storing its sensitive data in `settings.json`
+   * when the user enables `unifyChatProvider.storeApiKeyInSettings`.
+   *
+   * This must be `false` for OAuth-based credentials to avoid multi-device token
+   * refresh conflicts via Settings Sync.
+   */
+  supportsSensitiveDataInSettings: (auth: TAuth) => boolean;
   redactForExport: (auth: TAuth) => TAuth;
   resolveForExport: (auth: TAuth, secretStore: SecretStore) => Promise<TAuth>;
   normalizeOnImport: (

@@ -383,11 +383,13 @@ vscode://SmallMain.vscode-unify-chat-provider/import-config?config=<input>&auth=
 
 扩展配置存储在 `settings.json` 文件中，支持 VS Code 自带的设置云同步功能。
 
-但敏感信息（API Key、OAuth token、client secret）默认通过 VS Code 的 Secret Storage 存储，当前还不支持云同步。
+但敏感信息默认通过 VS Code 的 Secret Storage 存储，当前还不支持云同步。
 
 所以当配置同步到其它设备后，可能会要求你重新输入密钥或重新授权。
 
-如果你希望同步这类数据，可以在设置中启用 [`storeApiKeyInSettings`](vscode://settings/unifyChatProvider.storeApiKeyInSettings)，这将把敏感信息存储在 `settings.json` 中。
+如果你希望同步支持多设备同步的敏感数据（例如 API Key），可以在设置中启用 [`storeApiKeyInSettings`](vscode://settings/unifyChatProvider.storeApiKeyInSettings)。
+
+为避免多设备同步导致 token 刷新冲突，OAuth 凭证将始终保存在 Secret Storage 中。
 
 这会有用户数据泄露风险，你需要自行评估并决定是否启用该选项。
 

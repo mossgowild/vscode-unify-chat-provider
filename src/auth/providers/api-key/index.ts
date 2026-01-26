@@ -22,6 +22,10 @@ import { authLog } from '../../../logger';
  * API Key authentication provider implementation
  */
 export class ApiKeyAuthProvider implements AuthProvider {
+  static supportsSensitiveDataInSettings(_auth: ApiKeyAuthConfig): boolean {
+    return true;
+  }
+
   static redactForExport(auth: ApiKeyAuthConfig): ApiKeyAuthConfig {
     return { ...auth, apiKey: undefined };
   }

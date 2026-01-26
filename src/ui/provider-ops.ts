@@ -36,17 +36,21 @@ async function applyAuthStoragePolicy(options: {
     return next;
   }
 
-  const storeSecretsInSettings = options.store.storeApiKeyInSettings;
+  const ctor = getAuthMethodCtor(auth.method);
+  if (!ctor) {
+    return next;
+  }
+
+  const storeSecretsInSettings =
+    options.store.storeApiKeyInSettings &&
+    ctor.supportsSensitiveDataInSettings(auth);
   const existingAuth = options.existing?.auth;
 
-  const normalized = await getAuthMethodCtor(auth.method)!.normalizeOnImport(
-    auth,
-    {
-      secretStore: options.secretStore,
-      storeSecretsInSettings,
-      existing: existingAuth?.method === auth.method ? existingAuth : undefined,
-    },
-  );
+  const normalized = await ctor.normalizeOnImport(auth, {
+    secretStore: options.secretStore,
+    storeSecretsInSettings,
+    existing: existingAuth?.method === auth.method ? existingAuth : undefined,
+  });
   next.auth = normalized;
   return next;
 }
@@ -164,14 +168,22 @@ export async function duplicateProvider(
   const duplicated = deepClone(provider);
   duplicated.name = newName;
 
-  const storeSecretsInSettings = store.storeApiKeyInSettings;
-
   const auth = duplicated.auth;
   if (auth && auth.method !== 'none') {
+    const ctor = getAuthMethodCtor(auth.method);
+    if (!ctor) {
+      vscode.window.showErrorMessage(
+        t('Unsupported auth method: {0}', auth.method),
+        { modal: true },
+      );
+      return;
+    }
+
+    const storeSecretsInSettings =
+      store.storeApiKeyInSettings && ctor.supportsSensitiveDataInSettings(auth);
+
     try {
-      duplicated.auth = await getAuthMethodCtor(
-        auth.method,
-      )!.prepareForDuplicate(auth, {
+      duplicated.auth = await ctor.prepareForDuplicate(auth, {
         secretStore,
         storeSecretsInSettings,
       });

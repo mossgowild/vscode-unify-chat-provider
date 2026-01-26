@@ -30,6 +30,10 @@ function toPersistableConfig(
 }
 
 export class ClaudeCodeAuthProvider implements AuthProvider {
+  static supportsSensitiveDataInSettings(_auth: ClaudeCodeAuthConfig): boolean {
+    return false;
+  }
+
   static redactForExport(auth: ClaudeCodeAuthConfig): ClaudeCodeAuthConfig {
     return { ...toPersistableConfig(auth), token: undefined };
   }

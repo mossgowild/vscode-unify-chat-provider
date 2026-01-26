@@ -63,6 +63,10 @@ async function cleanupLegacyClientSecret(
 }
 
 export class AntigravityOAuthProvider implements AuthProvider {
+  static supportsSensitiveDataInSettings(_auth: AntigravityOAuthConfig): boolean {
+    return false;
+  }
+
   static redactForExport(auth: AntigravityOAuthConfig): AntigravityOAuthConfig {
     return { ...toPersistableConfig(auth), token: undefined };
   }

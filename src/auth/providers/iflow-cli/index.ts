@@ -39,6 +39,10 @@ function toPersistableConfig(
 }
 
 export class IFlowCliAuthProvider implements AuthProvider {
+  static supportsSensitiveDataInSettings(_auth: IFlowCliAuthConfig): boolean {
+    return false;
+  }
+
   static redactForExport(auth: IFlowCliAuthConfig): IFlowCliAuthConfig {
     return { ...toPersistableConfig(auth), token: undefined };
   }
@@ -540,4 +544,3 @@ export class IFlowCliAuthProvider implements AuthProvider {
     this._onDidChangeStatus.dispose();
   }
 }
-

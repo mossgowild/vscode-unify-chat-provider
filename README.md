@@ -397,11 +397,13 @@ If you are a developer for an LLM provider, you can add a link like the followin
 
 Extension configs are stored in `settings.json`, so they work with VS Code Settings Sync.
 
-However, sensitive information (API keys, OAuth tokens, client secrets) is stored in VS Code Secret Storage by default, which currently does not sync.
+However, sensitive information is stored in VS Code Secret Storage by default, which currently does not sync.
 
 So after syncing to another device, you may be prompted to re-enter keys or re-authorize.
 
-If you want to sync such data, enable [`storeApiKeyInSettings`](vscode://settings/unifyChatProvider.storeApiKeyInSettings). This stores sensitive information in `settings.json`.
+If you want to sync sync-safe sensitive data (e.g., API keys), enable [`storeApiKeyInSettings`](vscode://settings/unifyChatProvider.storeApiKeyInSettings).
+
+OAuth credentials are always kept in Secret Storage to avoid multi-device token refresh conflicts.
 
 This can increase the risk of user data leakage, so evaluate the risk before enabling.
 

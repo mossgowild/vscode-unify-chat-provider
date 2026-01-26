@@ -43,6 +43,10 @@ function toPersistableConfig(
 }
 
 export class OpenAICodexAuthProvider implements AuthProvider {
+  static supportsSensitiveDataInSettings(_auth: OpenAICodexAuthConfig): boolean {
+    return false;
+  }
+
   static redactForExport(auth: OpenAICodexAuthConfig): OpenAICodexAuthConfig {
     return { ...toPersistableConfig(auth), token: undefined };
   }

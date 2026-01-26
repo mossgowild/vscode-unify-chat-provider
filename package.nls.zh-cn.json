@@ -12,7 +12,7 @@
   "command.refreshAllProvidersOfficialModels.title": "Unify Chat Provider: 刷新所有供应商的官方模型",
   "configuration.title": "Unify Chat Provider",
   "configuration.verbose.description": "启用请求与响应的详细日志。",
-  "configuration.storeApiKeyInSettings.description": "将 API Key 存储在 settings.json 中，而不是 VS Code Secret Storage 中。\n\n危险：修改此设置会在存储位置之间迁移已有的 API Key（可能会以明文形式暴露密钥）。",
+  "configuration.storeApiKeyInSettings.description": "将支持多设备同步的敏感数据（例如 API Key）存储在 settings.json 中，而不是 VS Code Secret Storage 中。\n\n为避免多设备同步导致 token 刷新冲突，OAuth 凭证将始终保存在 Secret Storage 中。\n\n危险：修改此设置会在存储位置之间迁移已有的数据（可能会以明文形式暴露密钥）。",
   "configuration.endpoints.description": "LLM API 供应商端点列表。",
   "configuration.endpoints.type.description": "API 格式类型。决定请求如何格式化。",
   "configuration.endpoints.type.enumDescriptions.0": "Anthropic Messages API",

@@ -12,7 +12,7 @@
   "command.refreshAllProvidersOfficialModels.title": "Unify Chat Provider: Refresh All Provider's Official Models",
   "configuration.title": "Unify Chat Provider",
   "configuration.verbose.description": "Enable verbose logging of requests and responses.",
-  "configuration.storeApiKeyInSettings.description": "Store API keys in settings.json instead of VS Code Secret Storage.\n\nDANGER: Changing this setting will migrate existing API keys between storage locations (may expose secrets in plain text).",
+  "configuration.storeApiKeyInSettings.description": "Store sync-safe sensitive data (e.g., API keys) in settings.json instead of VS Code Secret Storage.\n\nOAuth credentials are always kept in Secret Storage to avoid multi-device token refresh conflicts.\n\nDANGER: Changing this setting will migrate existing data between storage locations (may expose secrets in plain text).",
   "configuration.endpoints.description": "List of LLM API provider endpoints.",
   "configuration.endpoints.type.description": "API format type. Determines how requests are formatted.",
   "configuration.endpoints.type.enumDescriptions.0": "Anthropic Messages API",

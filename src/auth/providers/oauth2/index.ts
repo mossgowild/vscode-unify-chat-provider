@@ -28,6 +28,10 @@ import { authLog } from '../../../logger';
  * OAuth 2.0 authentication provider implementation
  */
 export class OAuth2AuthProvider implements AuthProvider {
+  static supportsSensitiveDataInSettings(_auth: OAuth2AuthConfig): boolean {
+    return false;
+  }
+
   static redactForExport(auth: OAuth2AuthConfig): OAuth2AuthConfig {
     const oauth = auth.oauth;
 

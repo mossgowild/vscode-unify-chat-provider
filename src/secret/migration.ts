@@ -171,11 +171,18 @@ export async function migrateApiKeyStorage(options: {
       if (auth && auth.method !== 'none') {
         const before = stableStringify(auth);
 
-        const normalized = await getAuthMethodCtor(
-          auth.method,
-        )!.normalizeOnImport(auth, {
+        const ctor = getAuthMethodCtor(auth.method);
+        if (!ctor) {
+          updated.push(provider);
+          continue;
+        }
+
+        const storeSecretsInSettings =
+          options.storeApiKeyInSettings && ctor.supportsSensitiveDataInSettings(auth);
+
+        const normalized = await ctor.normalizeOnImport(auth, {
           secretStore: options.secretStore,
-          storeSecretsInSettings: options.storeApiKeyInSettings,
+          storeSecretsInSettings,
           existing: auth,
         });
 

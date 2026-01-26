@@ -208,6 +208,10 @@ async function pollAccessTokenOnce(
 }
 
 export class GitHubCopilotAuthProvider implements AuthProvider {
+  static supportsSensitiveDataInSettings(_auth: GitHubCopilotAuthConfig): boolean {
+    return false;
+  }
+
   static redactForExport(
     auth: GitHubCopilotAuthConfig,
   ): GitHubCopilotAuthConfig {

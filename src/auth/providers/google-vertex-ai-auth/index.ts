@@ -33,6 +33,12 @@ import { configureApiKey } from './screens/configure-api-key-screen';
  * Supports ADC, Service Account JSON key file, and API Key authentication.
  */
 export class GoogleVertexAIAuthProvider implements AuthProvider {
+  static supportsSensitiveDataInSettings(
+    auth: GoogleVertexAIAuthConfig,
+  ): boolean {
+    return auth.subType === 'api-key' || auth.subType === 'adc';
+  }
+
   // Token cache for ADC and Service Account modes
   private googleAuth: GoogleAuth | null = null;
   private cachedToken: { value: string; expiresAt: number } | null = null;
