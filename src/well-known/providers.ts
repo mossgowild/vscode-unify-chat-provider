@@ -361,6 +361,7 @@ export const WELL_KNOWN_PROVIDERS: WellKnownProviderConfig[] = [
     baseUrl: 'https://api.moonshot.cn',
     authTypes: ['api-key'],
     models: [
+      'kimi-k2.5',
       'kimi-k2-thinking',
       'kimi-k2-thinking-turbo',
       'kimi-k2-0905-preview',
@@ -374,6 +375,7 @@ export const WELL_KNOWN_PROVIDERS: WellKnownProviderConfig[] = [
     baseUrl: 'https://api.moonshot.ai',
     authTypes: ['api-key'],
     models: [
+      'kimi-k2.5',
       'kimi-k2-thinking',
       'kimi-k2-thinking-turbo',
       'kimi-k2-0905-preview',

@@ -1215,6 +1215,20 @@ const _WELL_KNOWN_MODELS = [
     temperature: 1.0,
   },
   {
+    id: 'kimi-k2.5',
+    name: 'Kimi K2.5',
+    maxInputTokens: 262144,
+    maxOutputTokens: 128000,
+    stream: true,
+    thinking: {
+      type: 'enabled',
+    },
+    capabilities: {
+      toolCalling: true,
+      imageInput: true,
+    },
+  },
+  {
     id: 'kimi-k2-thinking',
     overrides: ['moonshotai/kimi-k2-thinking'],
     name: 'Kimi K2 Thinking',
