@@ -484,7 +484,7 @@ export const WELL_KNOWN_PROVIDERS: WellKnownProviderConfig[] = [
     extraHeaders: {
       'User-Agent': 'iFlow-Cli',
     },
-    models: [],
+    models: ['glm-4.7'],
     autoFetchOfficialModels: true,
   },
 ];
