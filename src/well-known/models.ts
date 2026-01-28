@@ -1325,6 +1325,19 @@ const _WELL_KNOWN_MODELS = [
     temperature: 0.6,
   },
   {
+    id: 'qwen3-max-2026-01-23',
+    name: 'Qwen3-Max-Thinking',
+    maxInputTokens: 252000,
+    maxOutputTokens: 32000,
+    thinking: {
+      type: 'enabled',
+    },
+    capabilities: {
+      toolCalling: true,
+      imageInput: false,
+    },
+  },
+  {
     id: 'qwen3-max',
     name: 'Qwen3-Max',
     maxInputTokens: 262144,
