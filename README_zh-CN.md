@@ -670,6 +670,11 @@ vscode://SmallMain.vscode-unify-chat-provider/import-config?config=<input>&auth=
 - 部分模型完全免费。
 - 支持模型：变动频繁，名称中带 free 的模型。
 
+#### Ollama Cloud
+
+- 有一定的免费额度，按时间刷新额度。
+- 支持几乎所有开源权重模型。
+
 </details>
 
 ## 模型支持表

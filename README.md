@@ -670,6 +670,11 @@ Long-Term Free Quotas:
 - Some models are completely free.
 - Supported models: Frequently changing, models with 'free' in the name.
 
+#### Ollama Cloud
+
+- Each model has a certain free quota, refreshing over time.
+- Supports almost all open-source weight models.
+
 </details>
 
 ## Model Support Table
