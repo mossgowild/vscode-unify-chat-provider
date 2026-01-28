@@ -1,5 +1,14 @@
 # Changelog
 
+## v4.1.1 - 2026-01-28
+
+### Fixes
+- enhance nvidia support (f7f4148, SmallMain)
+- improve model selection UI searchability (711aa63, SmallMain)
+
+### Chores
+- update README.md (3672e15, SmallMain)
+
 ## v4.1.0 - 2026-01-27
 
 ### Features
