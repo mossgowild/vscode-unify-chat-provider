@@ -29,10 +29,6 @@ const _WELL_KNOWN_MODELS = [
     maxInputTokens: 256000,
     maxOutputTokens: 32000,
     stream: true,
-    thinking: {
-      type: 'enabled',
-      effort: 'high',
-    },
     capabilities: {
       toolCalling: true,
       imageInput: true,
